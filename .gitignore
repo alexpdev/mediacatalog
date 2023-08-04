@@ -9,3 +9,6 @@ build/
 venv/
 Directories/
 Directory Examples/
+images/
+*.nfo
+~*

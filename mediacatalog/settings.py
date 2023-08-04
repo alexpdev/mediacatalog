@@ -1,10 +1,22 @@
 from pathlib import Path
+from hashlib import blake2b
 
-from mediacatalog.utils import geticon
+from mediacatalog.utils import geticon, MAPPING
 
 from PySide6.QtWidgets import *
 from PySide6.QtCore import *
 from PySide6.QtGui import *
+
+class DbSql:
+    db = None
+
+def setting(key):
+    return DbSql.db.setting(key)
+
+def setSetting(key, value):
+    DbSql.db.setSetting(key, value)
+    
+
 
 class GroupBox(QGroupBox):
 
@@ -23,6 +35,13 @@ class GroupBox(QGroupBox):
         self.layout.addLayout(hlayout)
         self.add_button.clicked.connect(self.choose_folder)
         self.remove_button.clicked.connect(self.remove_folder)
+        self.refresh_list()
+    
+    def refresh_list(self):
+        contents = setting(self._title.lower())
+        for path in contents.split(";"):
+            self.list.addItem(path)
+            
 
     def choose_folder(self):
         dialog = DirectorySelectionDialog()
@@ -31,8 +50,8 @@ class GroupBox(QGroupBox):
 
     def onChange(self):
         items = [self.list.item(i) for i in range(self.list.count())]
-        paths = [item.text() for item in items if item]
-        self.somethingChanged.emit(self._title, ";".join(paths))
+        paths = [item.text() for item in items if item and item.text()]
+        self.somethingChanged.emit(self._title.lower(), ";".join(paths))
 
     def add_folder(self, path):
         self.list.addItem(path)
@@ -45,15 +64,92 @@ class GroupBox(QGroupBox):
         self.onChange()
 
 
+class TagBox(QGroupBox):
+
+    somethingChanged = Signal(str, str)
+    def __init__(self, title, field, parent=None):
+        super().__init__(title, parent=parent)
+        self._title = title
+        self._field = field
+        self.layout = QVBoxLayout(self)
+        self.list = QListWidget()
+        self.add_button = QPushButton("Add")
+        self.remove_button = QPushButton("Remove")
+        hlayout = QHBoxLayout()
+        hlayout.addWidget(self.add_button)
+        hlayout.addWidget(self.remove_button)
+        self.layout.addWidget(self.list)
+        self.layout.addLayout(hlayout)
+        self.add_button.clicked.connect(self.add_field)
+        self.remove_button.clicked.connect(self.remove_field)
+        self.refresh_list()
+    
+    def refresh_list(self):
+        options = setting(self._field)
+        for option in options.split(";"):
+            self.list.addItem(option)
+    
+    def onChange(self):
+        items = [self.list.item(i) for i in range(self.list.count())]
+        paths = [item.text() for item in items if item and item.text()]
+        self.somethingChanged.emit(self._field.lower(), ";".join(paths))
+    
+    def add_field(self):
+        text = QInputDialog.getText(self, f"Enter {self._field}", f"{self._field}")
+        if text:
+            self.list.addItem(text)
+            self.onChange()
+
+    def remove_field(self):
+        item = self.list.currentItem()
+        index = self.list.indexFromItem(item)
+        self.list.takeItem(index.row())
+        self.onChange()
+
+
+class FieldBox(QGroupBox):
+
+    somethingChanged = Signal(str, str)
+    def __init__(self, title, field, parent=None):
+        super().__init__(title, parent=parent)
+        self._title = title
+        self._field = field
+        self.layout = QVBoxLayout(self)
+        self.list = QListWidget()
+        self.layout.addWidget(self.list)
+        self.list.itemChanged.connect(self.onChange)
+        self.refresh_list()
+    
+    def refresh_list(self):
+        options = setting(self._field).split(";")
+        for key, value in MAPPING.items():
+            item = QListWidgetItem()
+            item.setText(value)
+            if key in options:
+                item.setCheckState(Qt.CheckState.Checked)
+            else:
+                item.setCheckState(Qt.CheckState.Unchecked)
+            self.list.addItem(item)
+
+    def onChange(self):
+        items = [self.list.item(i) for i in range(self.list.count())]
+        paths = [item.text() for item in items if item and item.text() and item.checkState() == Qt.CheckState.Checked]
+        fields = []
+        for key,value in MAPPING.items():
+            if value in paths:
+                fields.append(key)
+        self.somethingChanged.emit(self._field.lower(), ";".join(fields))
+    
 
 
 class Settings(QWidget):
     toHome = Signal()
+    somethingChanged = Signal()
     def __init__(self, db, parent=None):
         super().__init__(parent=parent)
         self.db = db
+        DbSql.db = db
         self.layout = QVBoxLayout(self)
-        grid = QGridLayout()
         self.toolbar = QToolBar()
         self.back_action = QAction(geticon("undo"), "Back", self)
         self.back_action.triggered.connect(self.toHome.emit)
@@ -63,18 +159,39 @@ class Settings(QWidget):
         self.tv_box = GroupBox("TV", self)
         self.ufc_box = GroupBox("UFC", self)
         self.documentaries_box = GroupBox("Documentaries", self)
-        grid.addWidget(self.movies_box, 0, 0)
-        grid.addWidget(self.tv_box, 0, 1)
-        grid.addWidget(self.ufc_box, 1, 0)
-        grid.addWidget(self.documentaries_box, 1, 1)
-        self.layout.addLayout(grid)
-        self.boxes = [self.movies_box, self.tv_box, self.ufc_box, self.documentaries_box]
+        self.tablefields = QListWidget()
+        self.profilefields = QListWidget()
+        self.genres = TagBox("Genre Tags", "genres", self)
+        self.quality = TagBox("Quality Tags", "quality", self)
+        self.tablefields = FieldBox("Table Fields", "tablefields", self)
+        self.profilefields = FieldBox("Profile Fields", "profilefields", self)
+        hlayout1 = QHBoxLayout()
+        vlayout0 = QVBoxLayout()
+        vlayout2 = QVBoxLayout()
+        vlayout4 = QVBoxLayout()
+        vlayout0.addWidget(self.movies_box)
+        vlayout0.addWidget(self.tv_box)
+        vlayout0.addWidget(self.ufc_box)
+        vlayout0.addWidget(self.documentaries_box)
+        hlayout1.addLayout(vlayout0)
+        self.layout.addLayout(hlayout1)
+        vlayout4.addWidget(self.genres)
+        vlayout4.addWidget(self.quality)
+        vlayout2.addWidget(self.tablefields)
+        vlayout2.addWidget(self.profilefields)
+        hlayout1.addLayout(vlayout4)
+        hlayout1.addLayout(vlayout2)
+        self.boxes = [self.movies_box, self.tv_box, 
+                      self.ufc_box, self.documentaries_box, 
+                      self.genres, self.quality, 
+                      self.tablefields, self.profilefields]
         for box in self.boxes:
             box.somethingChanged.connect(self.update_settings)
         
     def update_settings(self, key, value):
-        self.db.setSettings(key,value)
-        self.db.refresh_contents()
+        self.db.setSetting(key,value)
+        self.db.refresh_database()
+        self.somethingChanged.emit()
         
 
 
@@ -122,6 +239,9 @@ class DirectorySelectionDialog(QDialog):
         main_layout.addSpacing(10)
         main_layout.addWidget(button_box)
         self.setLayout(main_layout)
+    
+    def sizeHint(self):
+        return QSize(300, 300)
 
     def path_selected(self):
         self.selectionMade.emit(str(self.directory()))
