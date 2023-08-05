@@ -1,4 +1,5 @@
 import os
+import datetime
 import sqlite3
 import json
 import shutil
@@ -8,7 +9,8 @@ from PySide6.QtWidgets import *
 from PySide6.QtCore import *
 from PySide6.QtGui import *
 
-from mediacatalog.utils import nfo_to_dict, QUALITY, GENRES, MAPPING
+from mediacatalog.utils import nfo_to_dict, QUALITY, GENRES, MAPPING, EPISODE, SEASON
+
 
 def get_folder_size(path):
     total = 0
@@ -20,10 +22,15 @@ def get_folder_size(path):
             total += get_folder_size(fullpath)
     return total
 
+
 def find_image_files(path):
     paths = []
     if os.path.isfile(path) and os.path.splitext(path)[-1].lower() in [
-        ".jpg", ".png", ".jpeg", ".tiff", ".gif"
+        ".jpg",
+        ".png",
+        ".jpeg",
+        ".tiff",
+        ".gif",
     ]:
         paths.append(path)
         return paths
@@ -33,34 +40,54 @@ def find_image_files(path):
             paths += find_image_files(fullpath)
     return paths
 
+
 def find_nfo(path):
     for item in os.listdir(path):
         if os.path.splitext(item)[-1].lower() == ".nfo":
             return os.path.join(path, item)
     return None
 
+
 def scan_seasons(path):
     seasons = {}
     for name in os.listdir(path):
-        if name.lower().startswith("season"):
-            seasons[name] = []
-            fullpath = os.path.join(path, name)
+        fullpath = os.path.join(path, name)
+        if name.lower().startswith("season") and os.path.isdir(fullpath):
+            seasons[fullpath] = {
+                "name": name,
+                "playcount": 0,
+                "rating": 0,
+                "episodes": {},
+            }
             for episode in os.listdir(fullpath):
                 episode_path = os.path.join(fullpath, episode)
-                seasons[name].append(episode_path)
+                seasons[fullpath]["episodes"][episode_path] = {
+                    "filename": episode,
+                    "playcount": 0,
+                    "rating": 0,
+                    "title": os.path.splitext(episode)[0].split("- ")[-1],
+                }
     return seasons
+
 
 def scan_videos(path):
     video_files = []
     for name in os.listdir(path):
         if os.path.splitext(name)[-1].lower() in [
-            ".avi", ".mkv", ".mp4", ".mov", ".wmv"
+            ".avi",
+            ".mkv",
+            ".mp4",
+            ".mov",
+            ".wmv",
         ]:
             video_files.append(os.path.join(path, name))
     return video_files
 
+
 def scan_media(path, category, paths):
     records = []
+    if not path:
+        return records
     for item in os.listdir(path):
         record = {}
         fullpath = os.path.join(path, item)
@@ -71,13 +98,18 @@ def scan_media(path, category, paths):
         record["foldersize"] = get_folder_size(fullpath)
         record["images"] = find_image_files(fullpath)
         nfo = find_nfo(fullpath)
-        with open(nfo, "rt", encoding="utf8") as nfofile:
-            content = nfofile.read()
-        record.update(nfo_to_dict(content))
-        if category=="tv":
+        if nfo is not None:
+            with open(nfo, "rt", encoding="utf8") as nfofile:
+                content = nfofile.read()
+            record.update(nfo_to_dict(content))
+            record["nfopath"] = nfo
+        else:
+            temp = {key:None for key in MAPPING.keys() if key not in record}
+            record.update(temp)
+        if category == "tv":
             record["seasons"] = scan_seasons(fullpath)
-        else: 
-            if category=="movies":
+        else:
+            if category == "movies":
                 parts = item.split()
                 try:
                     record["foldertitle"] = parts[0]
@@ -89,8 +121,8 @@ def scan_media(path, category, paths):
         records.append(record)
     return records
 
-class SqlDatabase:
 
+class SqlDatabase:
     def __init__(self, path):
         self.imagedir = os.path.join(os.path.dirname(path), "imgs")
         self.setup_database(path)
@@ -98,9 +130,8 @@ class SqlDatabase:
         self.refresh_database()
 
     def setSetting(self, key, value):
-        print(key, value)
         curs = self.conn.cursor()
-        curs.execute(f'UPDATE settings SET "value" = "{value}" WHERE "key" = "{key}"')
+        curs.execute(f'UPDATE settings SET "value" = ? WHERE "key" = ?', (value, key))
         self.conn.commit()
         curs.close()
 
@@ -116,7 +147,7 @@ class SqlDatabase:
             cursor.execute(f"SELECT * FROM {key}")
             current = cursor.fetchall()
             paths = [i[0] for i in current]
-            for val in value.split(";"):
+            for val in json.loads(value):
                 records += scan_media(val, key, paths)
             for record in records:
                 path = record["path"]
@@ -127,17 +158,19 @@ class SqlDatabase:
                     with open(img, "rb") as imgfile:
                         name = md5(imgfile.read()).hexdigest()
                     loc = os.path.join(self.imagedir, name + ext)
-                    shutil.copy(img, loc) 
+                    shutil.copy(img, loc)
                     record["image_cached"].append(loc)
                 jsondata = json.dumps(record)
-                cursor.execute(f"INSERT INTO {key} values(?, ?, ?)", (path, foldername, jsondata))
+                cursor.execute(
+                    f"INSERT INTO {key} values(?, ?, ?)", (path, foldername, jsondata)
+                )
         self.conn.commit()
 
     def setting(self, key):
         cur = self.conn.cursor()
         cur.execute(f"SELECT * FROM settings WHERE key = ?", (key,))
-        result = cur.fetchall()[0][1]
-        return result
+        result = cur.fetchall()
+        return result[0][1]
 
     def setup_database(self, path):
         if os.path.exists(path):
@@ -146,25 +179,39 @@ class SqlDatabase:
             os.mkdir(self.imagedir)
         con = sqlite3.connect(path)
         cursor = con.cursor()
-        cursor.execute(
-            "CREATE TABLE movies(path, foldername, json)"
-        )
-        cursor.execute(
-            "CREATE TABLE tv(path, foldername, json)"
-        )
-        cursor.execute(
-            "CREATE TABLE ufc(path, foldername, json)"
-        )
-        cursor.execute(
-            "CREATE TABLE documentaries(path, foldername, json)"
-        )
+        cursor.execute("CREATE TABLE movies(path, foldername, json)")
+        cursor.execute("CREATE TABLE tv(path, foldername, json)")
+        cursor.execute("CREATE TABLE ufc(path, foldername, json)")
+        cursor.execute("CREATE TABLE documentaries(path, foldername, json)")
         cursor.execute("CREATE TABLE settings(key, value)")
         for i in ["movies", "tv", "ufc", "documentaries"]:
-            cursor.execute("INSERT INTO settings VALUES(?, ?)", (i, ""))
-        cursor.execute("INSERT INTO settings VALUES(?, ?)", ("genres", ";".join(GENRES)))
-        cursor.execute("INSERT INTO settings VALUES(?, ?)", ("quality", ";".join(list(QUALITY.keys()))))
-        cursor.execute("INSERT INTO settings VALUES(?, ?)", ("tablefields", ";".join(list(MAPPING.keys()))))
-        cursor.execute("INSERT INTO settings VALUES(?, ?)", ("profilefields", ";".join(list(MAPPING.keys()))))
+            cursor.execute("INSERT INTO settings VALUES(?, ?)", (i, json.dumps([])))
+            cursor.execute(
+                "INSERT INTO settings VALUES(?, ?)",
+                (i + "profilefields", json.dumps(list(MAPPING.keys()))),
+            )
+            cursor.execute(
+                "INSERT INTO settings VALUES(?, ?)",
+                (i + "columnfields", json.dumps(list(MAPPING.keys()))),
+            )
+        cursor.execute(
+            "INSERT INTO settings VALUES(?, ?)",
+            ("episodecolumnfields", json.dumps(list(EPISODE.keys()))),
+        )
+        cursor.execute(
+            "INSERT INTO settings VALUES(?, ?)",
+            ("seasoncolumnfields", json.dumps(list(SEASON.keys()))),
+        )
+        cursor.execute(
+            "INSERT INTO settings VALUES(?, ?)", ("genres", json.dumps(GENRES))
+        )
+        cursor.execute(
+            "INSERT INTO settings VALUES(?, ?)",
+            ("quality", json.dumps(list(QUALITY.keys()))),
+        )
+        cursor.execute(
+            "INSERT INTO settings VALUES(?, ?)", ("splittersize", json.dumps([600, 0]))
+        )
         con.commit()
 
     def update_field(self, table, foldername, key, value):
@@ -175,7 +222,10 @@ class SqlDatabase:
         record = json.loads(jsondata)
         record[key] = value
         jsondata = json.dumps(record)
-        cursor.execute(f"UPDATE {table} SET \"json\" = \"{jsondata}\" WHERE \"foldername\" = \"{foldername}\"")
+        cursor.execute(
+            f'UPDATE {table} SET "json" = ? WHERE "foldername" = ?',
+            (jsondata, foldername),
+        )
         self.conn.commit()
 
     def getData(self, table):

@@ -1,5 +1,3 @@
-
-
 _style = """
 QWidget
 {
@@ -623,6 +621,34 @@ QDoubleSpinBox:disabled
 QToolButton:disabled
 {
     background-color: rgba(235, 235, 235, 255);
+}
+QWidget[class="fieldWidget"] {
+    background-color: #444;
+    border: 1px outset #F00;
+}
+QWidget[class="genreWidget"] {
+    background-color: #CCC;
+}
+QLabel[class="field"] {
+    color: #FFF;
+}
+QPlainTextEdit[class="fieldtextedit"],
+QLineEdit[class="fieldedit"] {
+    border: 1px inset #F00;
+    background-color: #CCC;
+    color: #000;
+    font-size: 12pt;
+}
+QLabel[class="genre"] {
+    background-color: #742;
+    color: #FFF;
+    padding: 2px;
+    margin: 1px;
+    font-size: 9pt;
+    border: outset solid #233;
+}
+QCommandLinkButton{
+    font-size: 7pt;
 }
 """
 

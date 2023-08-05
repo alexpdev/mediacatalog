@@ -12,3 +12,5 @@ Directory Examples/
 images/
 *.nfo
 ~*
+imgs/
+*.db
