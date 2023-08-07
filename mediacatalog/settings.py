@@ -1,5 +1,6 @@
 from pathlib import Path
 import json
+import os
 
 from mediacatalog.utils import geticon, MAPPING
 
@@ -18,6 +19,14 @@ def setting(key):
 
 def setSetting(key, value):
     DbSql.db.setSetting(key, value)
+
+
+def updateField(table, foldername, key, value):
+    DbSql.db.updateField(table, foldername, key, value)
+
+
+def getData(table):
+    return DbSql.db.getData(table)
 
 
 class GroupBox(QGroupBox):
@@ -149,12 +158,15 @@ class FieldBox(QGroupBox):
 class Settings(QWidget):
     toHome = Signal()
     somethingChanged = Signal()
+    databaseReset = Signal()
 
     def __init__(self, db, parent=None):
         super().__init__(parent=parent)
-        self.db = db
-        DbSql.db = db
+        self.setDatabase(db)
         self.layout = QVBoxLayout(self)
+        self.deep_reset_checkbox = QCheckBox("Deep Refresh Mode")
+        self.reset_database_button = QPushButton("Reset Database")
+        self.refresh_database_button = QPushButton("Refresh Database")
         self.movies_box = GroupBox("Movies", self)
         self.tv_box = GroupBox("TV", self)
         self.ufc_box = GroupBox("UFC", self)
@@ -166,7 +178,11 @@ class Settings(QWidget):
         self.moviesprofile = FieldBox("Movies Profile", "moviesprofilefields", self)
         self.tvprofile = FieldBox("TV Profile", "tvprofilefields", self)
         self.ufcprofile = FieldBox("UFC Profile", "ufcprofilefields", self)
-        self.documentariesprofile = FieldBox("Documentaries Profile", "documentariesprofilefields", self)
+        self.documentariesprofile = FieldBox(
+            "Documentaries Profile", "documentariesprofilefields", self
+        )
+        self.reset_database_button.clicked.connect(self.onResetDatabase)
+        self.refresh_database_button.clicked.connect(self.onRefreshDatabase)
         hlayout1 = QHBoxLayout()
         vlayout0 = QVBoxLayout()
         vlayout2 = QVBoxLayout()
@@ -177,14 +193,17 @@ class Settings(QWidget):
         vlayout0.addWidget(self.documentaries_box)
         hlayout1.addLayout(vlayout0)
         self.layout.addLayout(hlayout1)
+        vlayout4.addWidget(self.reset_database_button)
+        vlayout4.addWidget(self.refresh_database_button)
+        vlayout4.addWidget(self.deep_reset_checkbox)
         vlayout4.addWidget(self.genres)
         vlayout4.addWidget(self.quality)
         vlayout2.addWidget(self.moviesprofile)
         vlayout2.addWidget(self.tvprofile)
         vlayout2.addWidget(self.ufcprofile)
         vlayout2.addWidget(self.documentariesprofile)
-        hlayout1.addLayout(vlayout4)
         hlayout1.addLayout(vlayout2)
+        hlayout1.addLayout(vlayout4)
         self.boxes = [
             self.movies_box,
             self.tv_box,
@@ -200,9 +219,22 @@ class Settings(QWidget):
         for box in self.boxes:
             box.somethingChanged.connect(self.update_settings)
 
+    def setDatabase(self, db):
+        DbSql.db = db
+
+    def onResetDatabase(self):
+        os.remove(DbSql.db.path)
+        self.databaseReset.emit()
+
+    def onRefreshDatabase(self):
+        if self.deep_reset_checkbox.isChecked():
+            DbSql.db.refresh_database(deep=True)
+        else:
+            DbSql.db.refresh_database()
+
     def update_settings(self, key, value):
-        self.db.setSetting(key, value)
-        self.db.refresh_database()
+        setSetting(key, value)
+        DbSql.db.refresh_database()
         self.somethingChanged.emit()
 
 

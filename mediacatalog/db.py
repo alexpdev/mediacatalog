@@ -12,6 +12,10 @@ from PySide6.QtGui import *
 from mediacatalog.utils import nfo_to_dict, QUALITY, GENRES, MAPPING, EPISODE, SEASON
 
 
+class Diff:
+    content = []
+
+
 def get_folder_size(path):
     total = 0
     if os.path.isfile(path):
@@ -84,14 +88,14 @@ def scan_videos(path):
     return video_files
 
 
-def scan_media(path, category, paths):
+def scan_media(path, category, paths, deep=False):
     records = []
     if not path:
         return records
     for item in os.listdir(path):
         record = {}
         fullpath = os.path.join(path, item)
-        if fullpath in paths:
+        if fullpath in paths and not deep:
             continue
         record["foldername"] = item
         record["path"] = fullpath
@@ -104,7 +108,7 @@ def scan_media(path, category, paths):
             record.update(nfo_to_dict(content))
             record["nfopath"] = nfo
         else:
-            temp = {key:None for key in MAPPING.keys() if key not in record}
+            temp = {key: None for key in MAPPING.keys() if key not in record}
             record.update(temp)
         if category == "tv":
             record["seasons"] = scan_seasons(fullpath)
@@ -124,10 +128,12 @@ def scan_media(path, category, paths):
 
 class SqlDatabase:
     def __init__(self, path):
+        self.path = path
         self.imagedir = os.path.join(os.path.dirname(path), "imgs")
         self.setup_database(path)
         self.conn = sqlite3.connect(path)
         self.refresh_database()
+        self.new_records = []
 
     def setSetting(self, key, value):
         curs = self.conn.cursor()
@@ -148,7 +154,7 @@ class SqlDatabase:
             current = cursor.fetchall()
             paths = [i[0] for i in current]
             for val in json.loads(value):
-                records += scan_media(val, key, paths)
+                records += scan_media(val, key, paths, deep=deep)
             for record in records:
                 path = record["path"]
                 foldername = record["foldername"]
@@ -161,9 +167,17 @@ class SqlDatabase:
                     shutil.copy(img, loc)
                     record["image_cached"].append(loc)
                 jsondata = json.dumps(record)
-                cursor.execute(
-                    f"INSERT INTO {key} values(?, ?, ?)", (path, foldername, jsondata)
-                )
+                if path in paths:
+                    diff, record = self.compare_records(
+                        record, json.loads(current[paths.index(path)][-1])
+                    )
+                    Diff.content.append({path: diff})
+                    self.updateField(key, foldername, "json", json.dumps(record))
+                else:
+                    cursor.execute(
+                        f"INSERT INTO {key} values(?, ?, ?)",
+                        (path, foldername, jsondata),
+                    )
         self.conn.commit()
 
     def setting(self, key):
@@ -214,7 +228,7 @@ class SqlDatabase:
         )
         con.commit()
 
-    def update_field(self, table, foldername, key, value):
+    def updateField(self, table, foldername, key, value):
         cursor = self.conn.cursor()
         cursor.execute(f"SELECT * FROM {table} WHERE foldername = ?", (foldername,))
         row = cursor.fetchone()
@@ -232,3 +246,31 @@ class SqlDatabase:
         cursor = self.conn.cursor()
         cursor.execute(f"SELECT * FROM {table}")
         return cursor.fetchall()
+
+    def compare_records(self, new_record, old_record):
+        diff = {}
+        for k, v in new_record.items():
+            if k in ["userrating", "playcount", "dateadded", "lastviewed", "comments"]:
+                continue
+            print("old", old_record)
+            print("new", new_record)
+            print(k, v)
+            if old_record[k] != v:
+                if k != "seasons":
+                    diff[k] = v
+                    old_record[k] = v
+                    continue
+                for season in v:
+                    if season not in old_record["seasons"]:
+                        diff.setdefault("seasons", {})
+                        diff["seasons"][season] = v
+                        old_record["seasons"][season] = new_record["seasons"][season]
+                    elif old_record["seasons"][season] != v:
+                        diff["seasons"][season] = {"episodes": []}
+                        for episode in season["episodes"]:
+                            if episode not in old_record["seasons"][season]["episodes"]:
+                                diff["season"][season]["episodes"].append(episode)
+                                old_record["season"][season]["episodes"] = new_record[
+                                    "season"
+                                ][season]["episodes"]
+        return diff, old_record

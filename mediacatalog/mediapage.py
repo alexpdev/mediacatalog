@@ -9,29 +9,32 @@ from PySide6.QtGui import *
 
 from mediacatalog import utils
 from mediacatalog.utils import MAPPING, SEASON, EPISODE
-from mediacatalog.settings import setting, setSetting
-
+from mediacatalog.settings import setting, setSetting, updateField, getData
 
 
 def reverse_mapping(field):
-    for k,v in MAPPING.items():
+    for k, v in MAPPING.items():
         if field == v:
             return k
 
+
 class MediaProfile(QWidget):
     fieldChanged = Signal(str, str)
+
     def __init__(self, table, parent=None):
         super().__init__(parent=parent)
         self._table = table
         self.images = None
         self.layout = QVBoxLayout(self)
         self.label = QLabel()
-        self.label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Expanding)
+        self.label.setSizePolicy(
+            QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Expanding
+        )
         self.label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.label.setScaledContents(True)
         self.button = QPushButton(self)
         self.button.clicked.connect(self.switchImage)
-        self.label.setFixedHeight(int(self.height() * .25))
+        self.label.setFixedHeight(int(self.height() * 0.25))
         self.layout.addWidget(self.label)
         self.layout.addWidget(self.button)
         self.scrollarea = QScrollArea()
@@ -58,21 +61,26 @@ class MediaProfile(QWidget):
     def onFieldChanged(self, field, value):
         self.fieldChanged.emit(field, value)
 
-
     def switchImage(self):
         if self.images:
             index = self.images.index(self._current)
             if index + 1 < len(self.images):
-                self._current = self.images[index+1]
+                self._current = self.images[index + 1]
                 self._currentPixmap = QPixmap(self._current)
             else:
-                self._current   =  self.images[0]
+                self._current = self.images[0]
                 self._currentPixmap = QPixmap(self._current)
             # self.label.setPixmap(self._currentPixmap)
             self.scaleLabel()
 
     def scaleLabel(self):
-        self.label.setPixmap(self._currentPixmap.scaled(self.label.width(), self.label.height(), Qt.AspectRatioMode.KeepAspectRatio))
+        self.label.setPixmap(
+            self._currentPixmap.scaled(
+                self.label.width(),
+                self.label.height(),
+                Qt.AspectRatioMode.KeepAspectRatio,
+            )
+        )
 
     def setCurrent(self, data):
         fields = json.loads(setting(self._table + "profilefields"))
@@ -90,7 +98,7 @@ class MediaProfile(QWidget):
                     self.fields[key].show()
 
     def resizeEvent(self, event):
-        self.label.setFixedHeight(int(self.height() * .25))
+        self.label.setFixedHeight(int(self.height() * 0.25))
         if self.images:
             self.scaleLabel()
         self.scrollWidget.setFixedWidth(self.scrollarea.viewport().width())
@@ -105,18 +113,16 @@ class MediaProfile(QWidget):
         pass
 
 
-
 class MediaPage(QWidget):
     toHome = Signal()
 
-    def __init__(self, db, table, parent=None):
+    def __init__(self, table, parent=None):
         super().__init__(parent=parent)
-        self.db = db
         self._table = table
         self.layout = QVBoxLayout(self)
         self.splitter = QSplitter()
         self.layout.addWidget(self.splitter)
-        self.table = TableView(db, table, MAPPING)
+        self.table = TableView(table, MAPPING)
         self.table.setColumnMenu(utils.ColumnMenu)
         self.splitter.addWidget(self.table)
         self.table.selectionModel().currentRowChanged.connect(self.onRowChanged)
@@ -139,12 +145,9 @@ class MediaPage(QWidget):
         data = self.table.tableModel().getRow(row)
         foldername = data["foldername"]
         key = reverse_mapping(field)
-        self.db.update_field(self._table, foldername, key, value)
+        updateField(self._table, foldername, key, value)
         data[key] = value
         self.table.tableModel().dataChanged.emit(row, row)
-
-
-
 
     def updateSplitterSizes(self, *args):
         setSetting("splittersize", json.dumps(args))
@@ -156,11 +159,11 @@ class MediaPage(QWidget):
 
 
 class TableView(QTableView):
-    def __init__(self, db, table, mapping, fields=None, parent=None):
+    def __init__(self, table, mapping, fields=None, parent=None):
         super().__init__(parent=parent)
         self._table = table
         self._fields = fields if fields is not None else table
-        self._model = SqlTableModel(db, self._table, mapping, fields=fields)
+        self._model = SqlTableModel(self._table, mapping, fields=fields)
         self._proxy_model = QSortFilterProxyModel()
         self.setModel(self._proxy_model)
         self._proxy_model.setSourceModel(self._model)
@@ -198,11 +201,11 @@ class TableView(QTableView):
 
 
 class TvPage(MediaPage):
-    def __init__(self, db, table, parent=None):
-        super().__init__(db, table, parent=parent)
-        self.season_table = TableView(db, table, SEASON, fields="season")
+    def __init__(self, table, parent=None):
+        super().__init__(table, parent=parent)
+        self.season_table = TableView(table, SEASON, fields="season")
         self.season_table.setColumnMenu(utils.SeasonMenu)
-        self.episode_table = TableView(db, table, EPISODE, fields="episode")
+        self.episode_table = TableView(table, EPISODE, fields="episode")
         self.episode_table.setColumnMenu(utils.EpisodeMenu)
         self.splitter.addWidget(self.season_table)
         self.splitter.addWidget(self.episode_table)
@@ -233,12 +236,11 @@ class TvPage(MediaPage):
 
 
 class SqlTableModel(QAbstractTableModel):
-    def __init__(self, db, table, mapping, fields=None, parent=None):
+    def __init__(self, table, mapping, fields=None, parent=None):
         super().__init__(parent=parent)
         self._table = table
         self._fields = fields if fields is not None else self._table
         self._mapping = mapping
-        self._db = db
         self._reverse = {v: k for k, v in mapping.items()}
         self._headers_labels = None
         self._headers = None
@@ -279,17 +281,25 @@ class SqlTableModel(QAbstractTableModel):
             self._headers_labels = headers_labels
             self._headers = [self._mapping[i] for i in self._headers_labels]
         elif len(headers_labels) < len(self._headers_labels):
-            idxs = [i for i in range(len(self._headers_labels)) if self._headers_labels[i] not in headers_labels]
+            idxs = [
+                i
+                for i in range(len(self._headers_labels))
+                if self._headers_labels[i] not in headers_labels
+            ]
             for idx in idxs:
                 self.removeColumn(idx, QModelIndex())
         elif len(headers_labels) > len(self._headers_labels):
-            idxs = [i for i in range(len(headers_labels)) if headers_labels[i] not in self._headers_labels]
+            idxs = [
+                i
+                for i in range(len(headers_labels))
+                if headers_labels[i] not in self._headers_labels
+            ]
             for idx in idxs:
                 self.insertColumn(idx, headers_labels[idx], QModelIndex())
 
     def getData(self):
         self.clearRows()
-        data = self._db.getData(self._table)
+        data = getData(self._table)
         for record in data:
             path, foldername, data = record
             data = json.loads(data)
@@ -349,7 +359,6 @@ class Watched(QWidget):
         return self.checkbox.size()
 
 
-
 class LineEdit(QLineEdit):
     def __init__(self, parent=None):
         super().__init__(parent=parent)
@@ -374,7 +383,7 @@ class RatingWidget(QWidget):
         self.setFixedHeight(30)
         self._layout = QVBoxLayout(self)
         self._layout.setSpacing(0)
-        self._layout.setContentsMargins(0,0,0,0)
+        self._layout.setContentsMargins(0, 0, 0, 0)
         self._widget = QWidget()
         self._widget_layout = None
         self._layout.addWidget(self._widget)
@@ -396,7 +405,7 @@ class RatingWidget(QWidget):
         self.clearWidget()
         self._widget = QWidget()
         self._widget_layout = QHBoxLayout(self._widget)
-        self._widget_layout.setContentsMargins(0,0,0,0)
+        self._widget_layout.setContentsMargins(0, 0, 0, 0)
         self._widget_layout.setSpacing(0)
         pixmap = QPixmap(utils.getimage("star")).scaledToHeight(30)
         for _ in range(int(text)):
@@ -421,18 +430,19 @@ class PlainTextEdit(QPlainTextEdit):
     def setText(self, text):
         self.setPlainText(text)
 
+
 class GenreWidget(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent=parent)
         self.setFixedHeight(35)
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground)
         self.setProperty("class", "genreWidget")
-        self.setContentsMargins(0,0,0,0)
+        self.setContentsMargins(0, 0, 0, 0)
         self._layout = QHBoxLayout(self)
         self._labels = []
         self._widget_layout = None
         self._layout.setSpacing(0)
-        self._layout.setContentsMargins(0,0,0,0)
+        self._layout.setContentsMargins(0, 0, 0, 0)
 
     def clear_layout(self):
         for layout in [self._layout, self._widget_layout]:
@@ -448,7 +458,7 @@ class GenreWidget(QWidget):
         self.clear_layout()
         self._widget = QWidget()
         self._widget_layout = QHBoxLayout(self._widget)
-        self._widget_layout.setContentsMargins(0,0,0,0)
+        self._widget_layout.setContentsMargins(0, 0, 0, 0)
         self._widget_layout.setSpacing(0)
         for item in text.split(";"):
             label = QLabel(item)
@@ -459,23 +469,31 @@ class GenreWidget(QWidget):
         self._widget_layout.addStretch(1)
         self._layout.addWidget(self._widget)
 
+
 class FieldLabel(QLabel):
     fieldChanged = Signal(str)
+
     def __init__(self, text, parent=None):
         super().__init__(text, parent=parent)
         self._text = text
         self._parent = parent
 
     def mouseDoubleClickEvent(self, event: QMouseEvent) -> None:
-        msgbox = QInputDialog.getText(self, "Edit " + self._text, self._text, QLineEdit.EchoMode.Normal, self._parent._value)
+        msgbox = QInputDialog.getText(
+            self,
+            "Edit " + self._text,
+            self._text,
+            QLineEdit.EchoMode.Normal,
+            self._parent._value,
+        )
         if msgbox and msgbox[0]:
             self.fieldChanged.emit(msgbox[0])
         return super().mouseDoubleClickEvent(event)
 
 
-
 class FieldWidget(QWidget):
     fieldChanged = Signal(str, str)
+
     def __init__(self, field, widget="line", parent=None):
         super().__init__(parent=parent)
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground)

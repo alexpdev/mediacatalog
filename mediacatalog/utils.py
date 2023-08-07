@@ -68,6 +68,7 @@ MAPPING = {
     "foldersize": "Folder Size",
     "lastviewed": "Last Viewed",
     "watched": "Watched",
+    "new": "New",
 }
 
 GENRES = [
@@ -177,9 +178,6 @@ def nfo_to_dict(content):
     return record
 
 
-
-
-
 class FlowLayout(QLayout):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -264,21 +262,22 @@ class FlowLayout(QLayout):
 
 class SeasonMenu(QMenu):
     menuItemToggled = Signal(str)
+
     def __init__(self, parent=None):
         super().__init__(parent=parent)
         self.playcount_action = QAction("Play Count")
         self.playcount_action.setCheckable(True)
         self.addAction(self.playcount_action)
-        self.playcount_action.toggled.connect(lambda : self.columnToggled("Play Count"))
+        self.playcount_action.toggled.connect(lambda: self.columnToggled("Play Count"))
         self.name_action = QAction("Name")
         self.name_action.setCheckable(True)
         self.addAction(self.name_action)
-        self.name_action.toggled.connect(lambda : self.columnToggled("Name"))
+        self.name_action.toggled.connect(lambda: self.columnToggled("Name"))
         self.rating_action = QAction("Rating")
         self.rating_action.setCheckable(True)
         self.addAction(self.rating_action)
-        self.rating_action.toggled.connect(lambda : self.columnToggled("Rating"))
-        self._reverse = {val:key for key,val in SEASON.items()}
+        self.rating_action.toggled.connect(lambda: self.columnToggled("Rating"))
+        self._reverse = {val: key for key, val in SEASON.items()}
 
     def columnToggled(self, text):
         key = self._reverse[text]
@@ -293,25 +292,26 @@ class SeasonMenu(QMenu):
 
 class EpisodeMenu(QMenu):
     menuItemToggled = Signal(str)
+
     def __init__(self, parent=None):
         super().__init__(parent=parent)
         self.filename_action = QAction("File Name")
         self.filename_action.setCheckable(True)
         self.addAction(self.filename_action)
-        self.filename_action.toggled.connect(lambda : self.columnToggled("File Name"))
+        self.filename_action.toggled.connect(lambda: self.columnToggled("File Name"))
         self.playcount_action = QAction("Play Count")
         self.playcount_action.setCheckable(True)
         self.addAction(self.playcount_action)
-        self.playcount_action.toggled.connect(lambda : self.columnToggled("Play Count"))
+        self.playcount_action.toggled.connect(lambda: self.columnToggled("Play Count"))
         self.title_action = QAction("Title")
         self.title_action.setCheckable(True)
         self.addAction(self.title_action)
-        self.title_action.toggled.connect(lambda : self.columnToggled("Title"))
+        self.title_action.toggled.connect(lambda: self.columnToggled("Title"))
         self.rating_action = QAction("Rating")
         self.rating_action.setCheckable(True)
         self.addAction(self.rating_action)
-        self.rating_action.toggled.connect(lambda : self.columnToggled("Rating"))
-        self._reverse = {val:key for key,val in EPISODE.items()}
+        self.rating_action.toggled.connect(lambda: self.columnToggled("Rating"))
+        self._reverse = {val: key for key, val in EPISODE.items()}
 
     def columnToggled(self, text):
         key = self._reverse[text]
@@ -323,8 +323,10 @@ class EpisodeMenu(QMenu):
             if key in lst:
                 action.setChecked(True)
 
+
 class ColumnMenu(QMenu):
     menuItemToggled = Signal(str)
+
     def __init__(self, parent=None):
         super().__init__(parent=parent)
         self.title_action = QAction("Title")
@@ -454,11 +456,15 @@ class ColumnMenu(QMenu):
         self.foldername_action = QAction("Folder Name")
         self.addAction(self.foldername_action)
         self.foldername_action.setCheckable(True)
-        self.foldername_action.toggled.connect(lambda: self.columnToggled("Folder Name"))
+        self.foldername_action.toggled.connect(
+            lambda: self.columnToggled("Folder Name")
+        )
         self.foldersize_action = QAction("Folder Size")
         self.addAction(self.foldersize_action)
         self.foldersize_action.setCheckable(True)
-        self.foldersize_action.toggled.connect(lambda: self.columnToggled("Folder Size"))
+        self.foldersize_action.toggled.connect(
+            lambda: self.columnToggled("Folder Size")
+        )
         # self.images_action = QAction("Image Paths")
         # self.addAction(self.images_action)
         # self.images_action.setCheckable(True)
@@ -466,12 +472,14 @@ class ColumnMenu(QMenu):
         self.lastviewed_action = QAction("Last Viewed")
         self.addAction(self.lastviewed_action)
         self.lastviewed_action.setCheckable(True)
-        self.lastviewed_action.toggled.connect(lambda: self.columnToggled("Last Viewed"))
+        self.lastviewed_action.toggled.connect(
+            lambda: self.columnToggled("Last Viewed")
+        )
         self.watched_action = QAction("Watched")
         self.addAction(self.watched_action)
         self.watched_action.setCheckable(True)
         self.watched_action.toggled.connect(lambda: self.columnToggled("Watched"))
-        self._reverse = {val:key for key,val in MAPPING.items()}
+        self._reverse = {val: key for key, val in MAPPING.items()}
 
     def columnToggled(self, text):
         key = self._reverse[text]

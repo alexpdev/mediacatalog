@@ -21,11 +21,12 @@ class Window(QMainWindow):
         self.setWindowIcon(geticon("popcorn"))
         self.central = QTabWidget(parent=self)
         self.settings = Settings(self.db, self)
-        self.movies = MediaPage(self.db, "movies", self)
-        self.tv = TvPage(self.db, "tv", self)
-        self.ufc = MediaPage(self.db, "ufc", self)
+        self.settings.databaseReset.connect(self.onDbReset)
+        self.movies = MediaPage("movies", self)
+        self.tv = TvPage("tv", self)
+        self.ufc = MediaPage("ufc", self)
         self.central.addTab(self.movies, "Movies")
-        self.documentaries = MediaPage(self.db, "documentaries", self)
+        self.documentaries = MediaPage("documentaries", self)
         self.central.addTab(self.tv, "TV")
         self.central.addTab(self.ufc, "UFC")
         self.central.addTab(self.documentaries, "Documentaries")
@@ -33,6 +34,10 @@ class Window(QMainWindow):
         self.setCentralWidget(self.central)
         self.settings.somethingChanged.connect(self.update_tables)
         self.resize(1500, 900)
+
+    def onDbReset(self):
+        del self.db
+        self.db = SqlDatabase(LOCAL / "media.db")
 
     def update_tables(self):
         for page in [self.movies, self.tv, self.ufc, self.documentaries]:
