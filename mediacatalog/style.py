@@ -638,6 +638,7 @@ QLineEdit[class="fieldedit"] {
     background-color: #CCC;
     color: #000;
     font-size: 12pt;
+    padding-bottom: 3px;
 }
 QLabel[class="genre"] {
     background-color: #742;
@@ -647,7 +648,7 @@ QLabel[class="genre"] {
     font-size: 9pt;
     border: outset solid #233;
 }
-QCommandLinkButton{
+QCommandLinkButton {
     font-size: 7pt;
 }
 """

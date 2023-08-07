@@ -16,7 +16,7 @@ class Window(QMainWindow):
     def __init__(self, parent=None) -> None:
         super().__init__(parent=parent)
         self.setObjectName("MainWindow")
-        self.setWindowTitle("Media Catalog")
+        self.setWindowTitle("Fuzzy's Media Manager")
         self.db = SqlDatabase(LOCAL / "media.db")
         self.setWindowIcon(geticon("popcorn"))
         self.central = QTabWidget(parent=self)

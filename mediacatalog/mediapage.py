@@ -58,10 +58,10 @@ class MediaProfile(QWidget):
                 self._currentPixmap = QPixmap(self._current)
             # self.label.setPixmap(self._currentPixmap)
             self.scaleLabel()
-        
+
     def scaleLabel(self):
         self.label.setPixmap(self._currentPixmap.scaled(self.label.width(), self.label.height(), Qt.AspectRatioMode.KeepAspectRatio))
-    
+
     def setCurrent(self, data):
         fields = json.loads(setting(self._table + "profilefields"))
         self.images = data["images"]
@@ -76,7 +76,7 @@ class MediaProfile(QWidget):
                     self.fields[key].hide()
                 else:
                     self.fields[key].show()
-    
+
     def resizeEvent(self, event):
         self.label.setFixedHeight(int(self.height() * .25))
         if self.images:
@@ -149,7 +149,7 @@ class TableView(QTableView):
         self.setSortingEnabled(True)
         self.columnMenu = None
         self.labels = json.loads(setting(self._fields + "columnfields"))
-    
+
     def setColumnMenu(self, menu):
         self.columnMenu = menu()
         self.columnMenu.setCheckedItems(self.labels)
@@ -165,7 +165,7 @@ class TableView(QTableView):
     def selectVisibleColumns(self, point):
         self.columnMenu.menuItemToggled.connect(self.toggleColumnHeader)
         self.columnMenu.popup(self.mapToGlobal(point))
-    
+
     def tableModel(self):
         return self._model
 
@@ -237,7 +237,7 @@ class SqlTableModel(QAbstractTableModel):
         self.beginRemoveRows(parent, row, row)
         del self._data[row]
         self.endRemoveRows()
-    
+
     def insertRow(self, row, value, parent=QModelIndex()):
         self.beginInsertRows(parent, row, row)
         self._data.insert(row, value)
@@ -295,7 +295,7 @@ class SqlTableModel(QAbstractTableModel):
         del self._headers[column]
         del self._headers_labels[column]
         self.endRemoveColumns()
-    
+
     def insertColumn(self, column, value, parent=QModelIndex()):
         self.beginRemoveColumns(parent, column, column)
         self._headers_labels.insert(column, value)
@@ -309,6 +309,35 @@ class LineEdit(QLineEdit):
         self._parent = parent
         self.setReadOnly(True)
         self.setProperty("class", "fieldedit")
+
+    def minimumSizeHint(self):
+        return self.sizeHint()
+
+    def sizeHint(self):
+        size = super().sizeHint()
+        return QSize(size.width(), self._parent.height())
+
+
+class RatingWidget(QWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent=parent)
+        self._parent = parent
+        self.layout = QHBoxLayout(self)
+        self.labels = []
+
+    def setText(self, text):
+        current = len(self.labels)
+        if int(text) < current:
+            for _ in range(current - int(text)):
+                self.labels[0].deleteLater()
+                del self.labels[0]
+        elif int(text) > current:
+            for _ in range(int(text) - current):
+                label = QLabel()
+                pix = QPixmap(utils.getimage("star")).scaledToHeight(self._parent.height())
+                label.setPixmap(pix)
+                self.labels.append(label)
+                self.layout.addWidget(label)
 
 
 class PlainTextEdit(QPlainTextEdit):
@@ -324,12 +353,9 @@ class PlainTextEdit(QPlainTextEdit):
     def setText(self, text):
         self.setPlainText(text)
 
-
-
-
 class GenreWidget(QWidget):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, parent=None):
+        super().__init__(parent=parent)
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground)
         self.setProperty("class", "genreWidget")
         self.hlayout = QHBoxLayout(self)
@@ -352,6 +378,24 @@ class GenreWidget(QWidget):
             self.hlayout.addWidget(label)
             self.labels.append(label)
 
+class FieldLabel(QLabel):
+    fieldChanged = Signal(str)
+    def __init__(self, text, parent=None):
+        super().__init__(text, parent=parent)
+        self._text = text
+        self._parent = parent
+
+
+
+    def mouseDoubleClickEvent(self, event: QMouseEvent) -> None:
+        msgbox = QInputDialog.getText(self, "Edit " + self._text, self._text, QLineEdit.EchoMode.Normal, self._parent._value)
+        print(msgbox)
+        if msgbox and msgbox[0]:
+            self.fieldChanged.emit(msgbox[0])
+        return super().mouseDoubleClickEvent(event)
+
+
+
 class FieldWidget(QWidget):
     def __init__(self, field, widget="line", parent=None):
         super().__init__(parent=parent)
@@ -361,7 +405,7 @@ class FieldWidget(QWidget):
         self.setProperty("class", "fieldWidget")
         if len(field.split()) > 1:
             field = "\n".join(field.split())
-        self.label = QLabel(field, self)
+        self.label = FieldLabel(field, self)
         self.label.setProperty("class", "field")
         self.label.setFixedWidth(68)
         print(field)
@@ -369,8 +413,10 @@ class FieldWidget(QWidget):
         self.layout = QFormLayout(self)
         self.layout.setSpacing(0)
         self.layout.setContentsMargins(0, 0, 0, 0)
-        if self._field in ["Genre"]:
-            self.line = GenreWidget()
+        if self._field == "Rating":
+            self.line = RatingWidget(self)
+        elif self._field in ["Genre", "Content Rating"]:
+            self.line = GenreWidget(self)
         elif self._field in ["NFO Path", "Trailer", "Folder Path"]:
             self.line = QCommandLinkButton(self)
             self.line.clicked.connect(self.open_path)
@@ -378,8 +424,10 @@ class FieldWidget(QWidget):
             self.line = LineEdit(self)
         elif widget == "text":
             self.line = PlainTextEdit(self)
+        self._value = None
         self.layout.addRow(self.label, self.line)
-    
+        self.label.fieldChanged.connect(self.setText)
+
     def open_path(self):
         if self._field == "Trailer":
             webbrowser.open_new_tab(self.line.text())
@@ -387,4 +435,5 @@ class FieldWidget(QWidget):
             subprocess.run(f"explorer.exe {self.line.text()}")
 
     def setText(self, text):
+        self._value = text
         self.line.setText(str(text))
