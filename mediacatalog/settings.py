@@ -155,11 +155,6 @@ class Settings(QWidget):
         self.db = db
         DbSql.db = db
         self.layout = QVBoxLayout(self)
-        self.toolbar = QToolBar()
-        self.back_action = QAction(geticon("undo"), "Back", self)
-        self.back_action.triggered.connect(self.toHome.emit)
-        self.layout.addWidget(self.toolbar)
-        self.toolbar.addAction(self.back_action)
         self.movies_box = GroupBox("Movies", self)
         self.tv_box = GroupBox("TV", self)
         self.ufc_box = GroupBox("UFC", self)

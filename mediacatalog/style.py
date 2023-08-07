@@ -131,7 +131,7 @@ QMenuBar
 }
 QMenuBar::item
 {
-    spacing: 3px; 
+    spacing: 3px;
     padding: 6px 12px;
     background: transparent;
     color: rgba(25, 25, 25, 255);
@@ -148,14 +148,14 @@ QMenuBar::item:pressed
 }
 QMenu
 {
-    background-color: rgba(255, 255, 255, 255); 
+    background-color: rgba(255, 255, 255, 255);
 }
 QMenu::item
 {
     color: rgba(25, 25, 25, 255);
 }
 QMenu::item:selected
-{	
+{
     background-color: rgba(90, 90, 90, 255);
     color: rgba(255, 168, 0, 255);
 }
@@ -238,7 +238,7 @@ QTabBar::tab:!selected
     );
 }
 QTabBar::scroller
-{ 
+{
     width: 24px;
 }
 QTabBar QToolButton
@@ -596,7 +596,7 @@ QSplitter::handle
     border-radius: 0px;
     width: 0px;
     height: 0px;
-    margin: 2px;
+    margin: 1px;
 }
 QLabel:disabled,
 QCheckBox:disabled,
@@ -626,24 +626,28 @@ QWidget[class="fieldWidget"] {
     background-color: #444;
     border: 1px outset #F00;
 }
+QWidget[class="ratingWidget"],
 QWidget[class="genreWidget"] {
     background-color: #CCC;
 }
 QLabel[class="field"] {
+    font-size: 8pt;
     color: #FFF;
 }
 QPlainTextEdit[class="fieldtextedit"],
 QLineEdit[class="fieldedit"] {
-    border: 1px inset #F00;
     background-color: #CCC;
     color: #000;
     font-size: 12pt;
-    padding-bottom: 3px;
+    margin-top: 1px;
+    margin-bottom: 1px;
 }
 QLabel[class="genre"] {
     background-color: #742;
     color: #FFF;
     padding: 2px;
+    padding-top: 5px;
+    padding-bottom: 5px;
     margin: 1px;
     font-size: 9pt;
     border: outset solid #233;

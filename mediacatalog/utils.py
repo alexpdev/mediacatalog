@@ -46,8 +46,6 @@ MAPPING = {
     "runtime": "Runtime",
     "userrating": "Rating",
     "tagline": "Tag Line",
-    "movie": "Movie",
-    "tv": "TV",
     "mpaa": "Content Rating",
     "playcount": "Play Count",
     "imdb": "IMDB",
@@ -58,23 +56,16 @@ MAPPING = {
     "year": "Year",
     "trailer": "Trailer",
     "studio": "Studio",
-    "vcodec": "Video Codec",
-    "acodec": "Audio Codec",
-    "height": "Height",
-    "width": "Width",
     "season": "Season",
     "episode": "Episode",
     "dateadded": "Date Added",
-    "tag": "Tag",
     "status": "Status",
     "comments": "Comments",
     "quality": "Quality",
-    "actors": "Actors",
-    "nfopath": "NFO Path",
-    "path": "Folder Path",
+    "nfopath": "NFO",
+    "path": "Folder",
     "foldername": "Folder Name",
     "foldersize": "Folder Size",
-    "images": "Image Paths",
     "lastviewed": "Last Viewed",
     "watched": "Watched",
 }
@@ -185,8 +176,8 @@ def nfo_to_dict(content):
         record["actors"].append([name, role])
     return record
 
-    
-    
+
+
 
 
 class FlowLayout(QLayout):
@@ -292,14 +283,14 @@ class SeasonMenu(QMenu):
     def columnToggled(self, text):
         key = self._reverse[text]
         self.menuItemToggled.emit(key)
-    
+
     def setCheckedItems(self, lst):
         for action in self.actions():
             key = self._reverse[action.text()]
             if key in lst:
                 action.setChecked(True)
 
-        
+
 class EpisodeMenu(QMenu):
     menuItemToggled = Signal(str)
     def __init__(self, parent=None):
@@ -325,7 +316,7 @@ class EpisodeMenu(QMenu):
     def columnToggled(self, text):
         key = self._reverse[text]
         self.menuItemToggled.emit(key)
-    
+
     def setCheckedItems(self, lst):
         for action in self.actions():
             key = self._reverse[action.text()]
@@ -356,14 +347,14 @@ class ColumnMenu(QMenu):
         self.addAction(self.tagline_action)
         self.tagline_action.setCheckable(True)
         self.tagline_action.toggled.connect(lambda: self.columnToggled("Tag Line"))
-        self.movie_action = QAction("Movie")
-        self.addAction(self.movie_action)
-        self.movie_action.setCheckable(True)
-        self.movie_action.toggled.connect(lambda: self.columnToggled("Movie"))
-        self.tv_action = QAction("TV")
-        self.addAction(self.tv_action)
-        self.tv_action.setCheckable(True)
-        self.tv_action.toggled.connect(lambda: self.columnToggled("TV"))
+        # self.movie_action = QAction("Movie")
+        # self.addAction(self.movie_action)
+        # self.movie_action.setCheckable(True)
+        # self.movie_action.toggled.connect(lambda: self.columnToggled("Movie"))
+        # self.tv_action = QAction("TV")
+        # self.addAction(self.tv_action)
+        # self.tv_action.setCheckable(True)
+        # self.tv_action.toggled.connect(lambda: self.columnToggled("TV"))
         self.mpaa_action = QAction("Content Rating")
         self.addAction(self.mpaa_action)
         self.mpaa_action.setCheckable(True)
@@ -404,22 +395,22 @@ class ColumnMenu(QMenu):
         self.addAction(self.studio_action)
         self.studio_action.setCheckable(True)
         self.studio_action.toggled.connect(lambda: self.columnToggled("Studio"))
-        self.vcodec_action = QAction("Video Codec")
-        self.addAction(self.vcodec_action)
-        self.vcodec_action.setCheckable(True)
-        self.vcodec_action.toggled.connect(lambda: self.columnToggled("Video Codec"))
-        self.acodec_action = QAction("Audio Codec")
-        self.addAction(self.acodec_action)
-        self.acodec_action.setCheckable(True)
-        self.acodec_action.toggled.connect(lambda: self.columnToggled("Audio Codec"))
-        self.height_action = QAction("Height")
-        self.addAction(self.height_action)
-        self.height_action.setCheckable(True)
-        self.height_action.toggled.connect(lambda: self.columnToggled("Height"))
-        self.width_action = QAction("Width")
-        self.addAction(self.width_action)
-        self.width_action.setCheckable(True)
-        self.width_action.toggled.connect(lambda: self.columnToggled("Width"))
+        # self.vcodec_action = QAction("Video Codec")
+        # self.addAction(self.vcodec_action)
+        # self.vcodec_action.setCheckable(True)
+        # self.vcodec_action.toggled.connect(lambda: self.columnToggled("Video Codec"))
+        # self.acodec_action = QAction("Audio Codec")
+        # self.addAction(self.acodec_action)
+        # self.acodec_action.setCheckable(True)
+        # self.acodec_action.toggled.connect(lambda: self.columnToggled("Audio Codec"))
+        # self.height_action = QAction("Height")
+        # self.addAction(self.height_action)
+        # self.height_action.setCheckable(True)
+        # self.height_action.toggled.connect(lambda: self.columnToggled("Height"))
+        # self.width_action = QAction("Width")
+        # self.addAction(self.width_action)
+        # self.width_action.setCheckable(True)
+        # self.width_action.toggled.connect(lambda: self.columnToggled("Width"))
         self.season_action = QAction("Season")
         self.addAction(self.season_action)
         self.season_action.setCheckable(True)
@@ -432,10 +423,10 @@ class ColumnMenu(QMenu):
         self.addAction(self.dateadded_action)
         self.dateadded_action.setCheckable(True)
         self.dateadded_action.toggled.connect(lambda: self.columnToggled("Date Added"))
-        self.tag_action = QAction("Tag")
-        self.addAction(self.tag_action)
-        self.tag_action.setCheckable(True)
-        self.tag_action.toggled.connect(lambda: self.columnToggled("Tag"))
+        # self.tag_action = QAction("Tag")
+        # self.addAction(self.tag_action)
+        # self.tag_action.setCheckable(True)
+        # self.tag_action.toggled.connect(lambda: self.columnToggled("Tag"))
         self.status_action = QAction("Status")
         self.addAction(self.status_action)
         self.status_action.setCheckable(True)
@@ -448,18 +439,18 @@ class ColumnMenu(QMenu):
         self.addAction(self.quality_action)
         self.quality_action.setCheckable(True)
         self.quality_action.toggled.connect(lambda: self.columnToggled("Quality"))
-        self.actors_action = QAction("Actors")
-        self.addAction(self.actors_action)
-        self.actors_action.setCheckable(True)
-        self.actors_action.toggled.connect(lambda: self.columnToggled("Actors"))
-        self.nfopath_action = QAction("NFO Path")
+        # self.actors_action = QAction("Actors")
+        # self.addAction(self.actors_action)
+        # self.actors_action.setCheckable(True)
+        # self.actors_action.toggled.connect(lambda: self.columnToggled("Actors"))
+        self.nfopath_action = QAction("NFO")
         self.addAction(self.nfopath_action)
         self.nfopath_action.setCheckable(True)
-        self.nfopath_action.toggled.connect(lambda: self.columnToggled("NFO Path"))
-        self.path_action = QAction("Folder Path")
+        self.nfopath_action.toggled.connect(lambda: self.columnToggled("NFO"))
+        self.path_action = QAction("Folder")
         self.addAction(self.path_action)
         self.path_action.setCheckable(True)
-        self.path_action.toggled.connect(lambda: self.columnToggled("Folder Path"))
+        self.path_action.toggled.connect(lambda: self.columnToggled("Folder"))
         self.foldername_action = QAction("Folder Name")
         self.addAction(self.foldername_action)
         self.foldername_action.setCheckable(True)
@@ -468,10 +459,10 @@ class ColumnMenu(QMenu):
         self.addAction(self.foldersize_action)
         self.foldersize_action.setCheckable(True)
         self.foldersize_action.toggled.connect(lambda: self.columnToggled("Folder Size"))
-        self.images_action = QAction("Image Paths")
-        self.addAction(self.images_action)
-        self.images_action.setCheckable(True)
-        self.images_action.toggled.connect(lambda: self.columnToggled("Image Paths"))
+        # self.images_action = QAction("Image Paths")
+        # self.addAction(self.images_action)
+        # self.images_action.setCheckable(True)
+        # self.images_action.toggled.connect(lambda: self.columnToggled("Image Paths"))
         self.lastviewed_action = QAction("Last Viewed")
         self.addAction(self.lastviewed_action)
         self.lastviewed_action.setCheckable(True)
@@ -481,11 +472,11 @@ class ColumnMenu(QMenu):
         self.watched_action.setCheckable(True)
         self.watched_action.toggled.connect(lambda: self.columnToggled("Watched"))
         self._reverse = {val:key for key,val in MAPPING.items()}
-    
+
     def columnToggled(self, text):
         key = self._reverse[text]
         self.menuItemToggled.emit(key)
-    
+
     def setCheckedItems(self, lst):
         for action in self.actions():
             key = self._reverse[action.text()]
