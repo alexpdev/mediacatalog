@@ -68,7 +68,7 @@ MAPPING = {
     "foldersize": "Folder Size",
     "lastviewed": "Last Viewed",
     "watched": "Watched",
-    "new": "New",
+    "pin": "Pin",
 }
 
 GENRES = [
@@ -163,6 +163,7 @@ def nfo_to_dict(content):
     record["quality"] = ""
     record["watched"] = False
     record["actors"] = []
+    record["pin"] = False
     if record["userrating"] is None:
         record["userrating"] = 0
     if record["playcount"] is None:
