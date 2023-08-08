@@ -13,7 +13,8 @@ from mediacatalog.utils import nfo_to_dict, QUALITY, GENRES, MAPPING, EPISODE, S
 
 
 class Diff:
-    content = []
+    new_content = {}
+    missing_content = []
 
 
 def get_folder_size(path):
@@ -152,11 +153,19 @@ class SqlDatabase:
             records = []
             cursor.execute(f"SELECT * FROM {key}")
             current = cursor.fetchall()
-            paths = [i[0] for i in current]
+            paths = []
+            for row in current:
+                path = row[0]
+                if not os.path.exists(path):
+                    self.missing_content.append(path)
+                else:
+                    paths.append(path)
             for val in json.loads(value):
                 records += scan_media(val, key, paths, deep=deep)
             for record in records:
                 path = record["path"]
+                if not deep:
+                    self.new_records[path] = record
                 foldername = record["foldername"]
                 record["image_cached"] = []
                 for img in record["images"]:
@@ -171,13 +180,14 @@ class SqlDatabase:
                     diff, record = self.compare_records(
                         record, json.loads(current[paths.index(path)][-1])
                     )
-                    Diff.content.append({path: diff})
+                    Diff.content[path] = diff
                     self.updateField(key, foldername, "json", json.dumps(record))
                 else:
                     cursor.execute(
                         f"INSERT INTO {key} values(?, ?, ?)",
                         (path, foldername, jsondata),
                     )
+
         self.conn.commit()
 
     def setting(self, key):

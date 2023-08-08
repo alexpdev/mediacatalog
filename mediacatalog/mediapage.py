@@ -8,7 +8,8 @@ from PySide6.QtGui import *
 
 
 from mediacatalog import utils
-from mediacatalog.utils import MAPPING, SEASON, EPISODE
+from mediacatalog.utils import MAPPING, SEASON, EPISODE, geticon
+from mediacatalog.db import Diff
 from mediacatalog.settings import setting, setSetting, updateField, getData
 
 
@@ -70,7 +71,6 @@ class MediaProfile(QWidget):
             else:
                 self._current = self.images[0]
                 self._currentPixmap = QPixmap(self._current)
-            # self.label.setPixmap(self._currentPixmap)
             self.scaleLabel()
 
     def scaleLabel(self):
@@ -319,11 +319,33 @@ class SqlTableModel(QAbstractTableModel):
 
     def data(self, index, role):
         if index.isValid():
+            row, col = index.row(), index.column()
+            label = self._headers[col]
+            field = self._reverse[label]
+            text = self._data[row][field]
+            if field == "pin" and text.lower() == "true":
+                if role == Qt.ItemDataRole.DecorationRole:
+                    return QIcon(geticon("pin"))
+                elif role == Qt.ItemDataRole.DisplayRole:
+                    return None
+            elif self._data[row]["path"] in Diff.missing_content:
+                if role == Qt.ItemDataRole.ForegroundRole:
+                    return QBrush(QColor("#400"))
+            elif self._data[row]["path"] in Diff.new_content:
+                if field in Diff.new_content[self._data[row]["path"]]:
+                    if role == Qt.ItemDataRole.ForegroundRole:
+                        return QBrush(QColor("#FF0"))
+                    elif role == Qt.ItemDataRole.BackgroundRole:
+                        return QBrush(QColor("#CCC"))
+            elif field == "watched":
+                if role == Qt.ItemDataRole.CheckStateRole:
+                    if text.lower() == True:
+                        return Qt.CheckState.Checked
+                    else:
+                        return Qt.CheckState.Unchecked
+                elif role == Qt.ItemDataRole.DisplayRole:
+                    return None
             if role == Qt.ItemDataRole.DisplayRole:
-                row, col = index.row(), index.column()
-                label = self._headers[col]
-                field = self._reverse[label]
-                text = self._data[row][field]
                 return text
         return None
 
@@ -422,6 +444,7 @@ class PlainTextEdit(QPlainTextEdit):
         super().__init__(parent=parent)
         self._parent = parent
         self.setReadOnly(True)
+        self.setMaximumHeight(50)
         self.setProperty("class", "fieldtextedit")
 
     def text(self):
