@@ -134,7 +134,6 @@ class SqlDatabase:
         self.setup_database(path)
         self.conn = sqlite3.connect(path)
         self.refresh_database()
-        self.new_records = []
 
     def setSetting(self, key, value):
         curs = self.conn.cursor()
@@ -165,7 +164,7 @@ class SqlDatabase:
             for record in records:
                 path = record["path"]
                 if not deep:
-                    self.new_records[path] = record
+                    Diff.new_content[path] = record
                 foldername = record["foldername"]
                 record["image_cached"] = []
                 for img in record["images"]:
@@ -262,9 +261,6 @@ class SqlDatabase:
         for k, v in new_record.items():
             if k in ["userrating", "playcount", "dateadded", "lastviewed", "comments"]:
                 continue
-            print("old", old_record)
-            print("new", new_record)
-            print(k, v)
             if old_record[k] != v:
                 if k != "seasons":
                     diff[k] = v

@@ -598,6 +598,9 @@ QSplitter::handle
     height: 0px;
     margin: 1px;
 }
+QWidget[class="scrollBack"] {
+    background-image: url('./assets/wooden-texture.png') 0 0 0 0 stretch stretch;
+}
 QLabel:disabled,
 QCheckBox:disabled,
 QLineEdit:disabled,
@@ -638,7 +641,7 @@ QPlainTextEdit[class="fieldtextedit"],
 QLineEdit[class="fieldedit"] {
     background-color: #CCC;
     color: #000;
-    font-size: 12pt;
+    font-size: 11pt;
     margin-top: 1px;
     margin-bottom: 1px;
 }
@@ -654,6 +657,9 @@ QLabel[class="genre"] {
 }
 QCommandLinkButton {
     font-size: 7pt;
+}
+Qmenu[class="ratingMenu"] {
+    icon-size: 100px;
 }
 """
 

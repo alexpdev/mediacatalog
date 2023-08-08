@@ -1,5 +1,6 @@
 import json
 import subprocess
+from datetime import datetime
 import webbrowser
 
 from PySide6.QtWidgets import *
@@ -43,6 +44,7 @@ class MediaProfile(QWidget):
             Qt.ScrollBarPolicy.ScrollBarAlwaysOff
         )
         self.scrollWidget = QWidget()
+        self.scrollWidget.setProperty("class", "scrollBack")
         self.setContentsMargins(5, 5, 5, 5)
         self.scrollarea.setWidget(self.scrollWidget)
         self.scrollarea.setWidgetResizable(True)
@@ -56,8 +58,14 @@ class MediaProfile(QWidget):
             else:
                 widget = FieldWidget(value, "line", self)
             widget.fieldChanged.connect(self.onFieldChanged)
+            widget.watchedEnabled.connect(self.onWatched)
             self.fields[key] = widget
             self.scrolllayout.addWidget(widget)
+
+    def onWatched(self):
+        self.fieldChanged.emit("Watched", "true")
+        self.fieldChanged.emit("Play Count", "1")
+        self.fieldChanged.emit("Last Viewed", datetime.today().strftime("%m-%d-%Y"))
 
     def onFieldChanged(self, field, value):
         self.fieldChanged.emit(field, value)
@@ -79,6 +87,7 @@ class MediaProfile(QWidget):
                 self.label.width(),
                 self.label.height(),
                 Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation
             )
         )
 
@@ -105,11 +114,9 @@ class MediaProfile(QWidget):
         super().resizeEvent(event)
 
     def setCurrentSeason(self, data):
-        print(data)
         pass
 
     def setCurrentEpisode(self, data):
-        print(data)
         pass
 
 
@@ -179,6 +186,8 @@ class TableView(QTableView):
         self.setSortingEnabled(True)
         self.columnMenu = None
         self.labels = json.loads(setting(self._fields + "columnfields"))
+
+
 
     def setColumnMenu(self, menu):
         self.columnMenu = menu()
@@ -323,9 +332,10 @@ class SqlTableModel(QAbstractTableModel):
             label = self._headers[col]
             field = self._reverse[label]
             text = self._data[row][field]
-            if field == "pin" and text.lower() == "true":
-                if role == Qt.ItemDataRole.DecorationRole:
-                    return QIcon(geticon("pin"))
+            if field == "pin":
+                if text:
+                    if role == Qt.ItemDataRole.DecorationRole:
+                        return QIcon(geticon("pin"))
                 elif role == Qt.ItemDataRole.DisplayRole:
                     return None
             elif self._data[row]["path"] in Diff.missing_content:
@@ -334,12 +344,12 @@ class SqlTableModel(QAbstractTableModel):
             elif self._data[row]["path"] in Diff.new_content:
                 if field in Diff.new_content[self._data[row]["path"]]:
                     if role == Qt.ItemDataRole.ForegroundRole:
-                        return QBrush(QColor("#FF0"))
+                        return QBrush(QColor("#770"))
                     elif role == Qt.ItemDataRole.BackgroundRole:
                         return QBrush(QColor("#CCC"))
             elif field == "watched":
                 if role == Qt.ItemDataRole.CheckStateRole:
-                    if text.lower() == True:
+                    if text:
                         return Qt.CheckState.Checked
                     else:
                         return Qt.CheckState.Unchecked
@@ -365,6 +375,7 @@ class SqlTableModel(QAbstractTableModel):
 class Watched(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent=parent)
+        self._parent = parent
         self.setProperty("class", "Watched")
         self.layout = QVBoxLayout(self)
         self.checkbox = QCheckBox()
@@ -430,11 +441,20 @@ class RatingWidget(QWidget):
         self._widget_layout.setContentsMargins(0, 0, 0, 0)
         self._widget_layout.setSpacing(0)
         pixmap = QPixmap(utils.getimage("star")).scaledToHeight(30)
-        for _ in range(int(text)):
+        halfpixmap = QPixmap(utils.getimage("halfstar")).scaledToHeight(30)
+        count = float(text)
+        while count > .5:
             label = QLabel()
             label.setPixmap(pixmap)
             self._labels.append(label)
             self._widget_layout.addWidget(label)
+            count -= 1
+        if count == .5:
+            label = QLabel()
+            label.setPixmap(halfpixmap)
+            self._labels.append(label)
+            self._widget_layout.addWidget(label)
+            count -= .5
         self._widget_layout.addStretch(1)
         self._layout.addWidget(self._widget)
 
@@ -444,7 +464,7 @@ class PlainTextEdit(QPlainTextEdit):
         super().__init__(parent=parent)
         self._parent = parent
         self.setReadOnly(True)
-        self.setMaximumHeight(50)
+        self.setMaximumHeight(65)
         self.setProperty("class", "fieldtextedit")
 
     def text(self):
@@ -502,20 +522,110 @@ class FieldLabel(QLabel):
         self._parent = parent
 
     def mouseDoubleClickEvent(self, event: QMouseEvent) -> None:
-        msgbox = QInputDialog.getText(
-            self,
-            "Edit " + self._text,
-            self._text,
-            QLineEdit.EchoMode.Normal,
-            self._parent._value,
-        )
-        if msgbox and msgbox[0]:
-            self.fieldChanged.emit(msgbox[0])
+        if self._text.lower() in ["pin"]:
+            value = QMessageBox.question(self, self._text, "Add to Pinned Items?", QMessageBox.StandardButton.Yes, QMessageBox.StandardButton.No)
+            if value == QMessageBox.StandardButton.Yes:
+                self.fieldChanged.emit("true")
+            else:
+                self.fieldChange.emit("false")
+        elif self._text.lower() in [ "season", "episode",  "nfo", "path", "folder name", "folder size"]:
+            pass
+        elif self._text.lower() in ["imdb", "title", "plot", "tag line","country", "director", "year", "trailer", "studio", "status", "content\nrating", "comments"]:
+            msgbox = QInputDialog.getText(
+                self,
+                "Edit " + self._text,
+                self._text,
+                QLineEdit.EchoMode.Normal,
+                self._parent._value,
+            )
+            if msgbox and msgbox[0]:
+                self.fieldChanged.emit(msgbox[0])
+        elif self._text.lower() in ["premiered",  "last\nviewed", "date\nadded"]:
+            msgbox = DateDialog(self._text, self._parent.line.text())
+            msgbox.chosen.connect(self.setFieldChange)
+            msgbox.exec()
+        elif self._text.lower() in ["runtime", "play\ncount"]:
+            msgbox = QInputDialog.getInt(self, "Edit " + self._text, self._text, int(self._parent.line.text()))
+            if msgbox and msgbox[0]:
+                self.fieldChanged.emit(msgbox[0])
+        elif self._text.lower() in ["quality"]:
+            lst = utils.QUALITY.values()
+            msgbox = QInputDialog.getItem(self, "Edit " + self._text, self._text, lst, 0, False)
+            if msgbox and msgbox[0]:
+                for k,v in utils.QUALITY.items():
+                    if msgbox[0] == v:
+                        self.fieldChanged.emit(k)
+                        break
+        elif self._text.lower() == "rating":
+            menu = QMenu()
+            action_05 = QAction(".5", self)
+            menu.addAction(action_05)
+            action_05.triggered.connect(lambda: self.fieldChanged.emit(str(.5)))
+            action_1 = QAction("1", self)
+            menu.addAction(action_1)
+            action_1.triggered.connect(lambda: self.fieldChanged.emit(str(1)))
+            action_105 = QAction("1.5", self)
+            menu.addAction(action_105)
+            action_105.triggered.connect(lambda: self.fieldChanged.emit(str(1.5)))
+            action_2 = QAction("2", self)
+            menu.addAction(action_2)
+            action_2.triggered.connect(lambda: self.fieldChanged.emit(str(2)))
+            action_205 = QAction("2.5", self)
+            menu.addAction(action_205)
+            action_205.triggered.connect(lambda: self.fieldChanged.emit(str(2.5)))
+            action_3 = QAction("3", self)
+            menu.addAction(action_3)
+            action_3.triggered.connect(lambda: self.fieldChanged.emit(str(3)))
+            action_305 = QAction("3.5", self)
+            menu.addAction(action_305)
+            action_305.triggered.connect(lambda: self.fieldChanged.emit(str(3.5)))
+            action_4 = QAction("4", self)
+            menu.addAction(action_4)
+            action_4.triggered.connect(lambda: self.fieldChanged.emit(str(4)))
+            action_405 = QAction("4.5", self)
+            menu.addAction(action_405)
+            action_405.triggered.connect(lambda: self.fieldChanged.emit(str(4.5)))
+            action_5 = QAction("5", self)
+            menu.addAction(action_5)
+            action_5.triggered.connect(lambda: self.fieldChanged.emit(str(5)))
+            menu.exec(QCursor.pos())
+
         return super().mouseDoubleClickEvent(event)
+
+    def setFieldChange(self, value):
+        print(value, type(value))
+        self.fieldChanged.emit(value)
+
+class DateDialog(QDialog):
+    chosen = Signal(str)
+
+    def __init__(self, field, current, parent=None):
+        super().__init__(parent=parent)
+        self.setWindowTitle("Edit " +  field)
+        self.vboxlayout = QVBoxLayout(self)
+        self.dateedit = QDateEdit()
+        self.label = QLabel(field)
+        self.formlayout = QFormLayout()
+        self.formlayout.addRow(field, self.dateedit)
+        self.button = QPushButton("Ok", self)
+        self.vboxlayout.addLayout(self.formlayout)
+        self.vboxlayout.addWidget(self.button)
+        self.button.clicked.connect(self.submit)
+
+    def submit(self):
+        date = self.dateedit.date().toPython()
+        output = date.strftime("%m-%d-%Y")
+        self.chosen.emit(output)
+        self.done(1)
+
+
+
+
 
 
 class FieldWidget(QWidget):
     fieldChanged = Signal(str, str)
+    watchedEnabled = Signal()
 
     def __init__(self, field, widget="line", parent=None):
         super().__init__(parent=parent)
@@ -536,6 +646,7 @@ class FieldWidget(QWidget):
             self.line = RatingWidget(self)
         elif self._field == "Watched":
             self.line = Watched(self)
+            self.line.checkbox.clicked.connect(self.watchedToggled)
         elif self._field in ["Genre", "Content Rating"]:
             self.line = GenreWidget(self)
         elif self._field in ["NFO Path", "Trailer", "Folder Path"]:
@@ -548,6 +659,10 @@ class FieldWidget(QWidget):
         self._value = None
         self.layout.addRow(self.label, self.line)
         self.label.fieldChanged.connect(self.onFieldChanged)
+
+    def watchedToggled(self):
+        if self.line.checkbox.isChecked():
+            self.watchedEnabled.emit()
 
     def onFieldChanged(self, text):
         self.setText(text)
@@ -562,3 +677,62 @@ class FieldWidget(QWidget):
     def setText(self, text):
         self._value = text
         self.line.setText(str(text))
+        if isinstance(self.line, LineEdit):
+            self.line.setCursorPosition(0)
+
+
+class CheckBoxDelegate(QStyledItemDelegate):
+
+    createEditor = lambda self, _, __, ___: None
+
+    def paint(self, painter, option, index):
+        checked = bool(index.model().data(index, Qt.DisplayRole))
+        check_box_style_option = QStyleOptionButton()
+
+        if (index.flags() & Qt.ItemIsEditable) > 0:
+            check_box_style_option.state |= QStyle.State_Enabled
+        else:
+            check_box_style_option.state |= QStyle.State_ReadOnly
+
+        if checked:
+            check_box_style_option.state |= QStyle.State_On
+        else:
+            check_box_style_option.state |= QStyle.State_Off
+
+        check_box_style_option.rect = self.getCheckBoxRect(option)
+        if not index.model().hasFlag(index, Qt.ItemFlag.ItemIsEditable):
+            check_box_style_option.state |= QStyle.State_ReadOnly
+        QApplication.style().drawControl(QStyle.CE_CheckBox, check_box_style_option, painter)
+
+
+    def editorEvent(self, event, model, option, index):
+        if not (index.flags() & Qt.ItemIsEditable) > 0:
+            return False
+        if event.type() == QEvent.MouseButtonRelease or event.type() == QEvent.MouseButtonDblClick:
+            if event.button() != Qt.LeftButton or not self.getCheckBoxRect(option).contains(event.pos()):
+                return False
+            if event.type() == QEvent.MouseButtonDblClick:
+                return True
+        elif event.type() == QEvent.KeyPress:
+            if event.key() != Qt.Key_Space and event.key() != Qt.Key_Select:
+                return False
+        else:
+            return False
+        self.setModelData(None, model, index)
+        return True
+
+    def setModelData (self, editor, model, index):
+        newValue = not bool(index.model().data(index, Qt.DisplayRole))
+        model.setData(index, newValue, Qt.EditRole)
+
+
+    def getCheckBoxRect(self, option):
+        check_box_style_option = QStyleOptionButton()
+        check_box_rect = QApplication.style().subElementRect(QStyle.SE_CheckBoxIndicator, check_box_style_option, None)
+        check_box_point = QPoint (option.rect.x() +
+                             option.rect.width() / 2 -
+                             check_box_rect.width() / 2,
+                             option.rect.y() +
+                             option.rect.height() / 2 -
+                             check_box_rect.height() / 2)
+        return QRect(check_box_point, check_box_rect.size())
