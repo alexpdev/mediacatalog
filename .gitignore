@@ -14,3 +14,5 @@ images/
 ~*
 imgs/
 *.db
+output/
+*.spec
