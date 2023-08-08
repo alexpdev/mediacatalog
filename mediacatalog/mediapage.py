@@ -63,7 +63,7 @@ class MediaProfile(QWidget):
             self.scrolllayout.addWidget(widget)
 
     def onWatched(self):
-        self.fieldChanged.emit("Watched", "true")
+        self.fieldChanged.emit("Watched", "watched")
         self.fieldChanged.emit("Play Count", "1")
         self.fieldChanged.emit("Last Viewed", datetime.today().strftime("%m-%d-%Y"))
 
@@ -120,6 +120,143 @@ class MediaProfile(QWidget):
         pass
 
 
+class ToolBar(QToolBar):
+    somethingChanged = Signal()
+
+    def __init__(self, parent=None):
+        super().__init__(parent=parent)
+        left = QWidget()
+        left.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        left.setFixedHeight(0)
+        self.addWidget(left)
+        title = QLabel("Title")
+        self.addWidget(title)
+        self.title_line = QLineEdit()
+        self.title_line.setMaximumWidth(100)
+        self.addWidget(self.title_line)
+        self.addSeparator()
+        self.quality = QToolButton()
+        self.quality.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        self.quality.setText("Quality")
+        self.addWidget(self.quality)
+        self.addSeparator()
+        self.genre = QToolButton()
+        self.genre.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        self.genre.setText("Genre")
+        self.addWidget(self.genre)
+        self.addSeparator()
+        self.status = QToolButton()
+        self.status.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        self.status.setText("Status")
+        self.addWidget(self.status)
+        self.addSeparator()
+        self.watched = QToolButton()
+        self.watched.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        self.watched.setText("Watched")
+        self.addWidget(self.watched)
+        self.addSeparator()
+        self.rating = QToolButton()
+        self.rating.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        self.rating.setText("Rating")
+        self.addWidget(self.rating)
+        self.addSeparator()
+        folder_size = QLabel("Folder Size")
+        self.addWidget(folder_size)
+        self.folder_size_combo = QComboBox()
+        for i in ["", ">", "<", "="]:
+            self.folder_size_combo.addItem(i)
+        self.addWidget(self.folder_size_combo)
+        self.folder_size_value = QSpinBox()
+        self.addWidget(self.folder_size_value)
+        self.addSeparator()
+        right = QWidget()
+        right.setFixedHeight(0)
+        right.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.addWidget(right)
+        self.setupMenus()
+        self.setupSignals()
+
+    def onChange(self, *args):
+        self.somethingChanged.emit()
+
+    def setupSignals(self):
+        self.title_line.textChanged.connect(self.onChange)
+        for action in self.quality_action_group.actions():
+            action.toggled.connect(self.onChange)
+        for action in self.genre_action_group.actions():
+            action.toggled.connect(self.onChange)
+        for action in self.watched_action_group.actions():
+            action.toggled.connect(self.onChange)
+        for action in self.rating_action_group.actions():
+            action.toggled.connect(self.onChange)
+        for action in self.status_action_group.actions():
+            action.toggled.connect(self.onChange)
+        self.folder_size_combo.currentTextChanged.connect(self.onChange)
+        self.folder_size_value.valueChanged.connect(self.onChange)
+
+    def gather_values(self):
+        title = self.title_line.text()
+        quality = [a.text() for a in self.quality_action_group.actions() if a.isChecked()]
+        rating = [a.text() for a in self.rating_action_group.actions() if a.isChecked()]
+        genre = [a.text() for a in self.genre_action_group.actions() if a.isChecked()]
+        watched = [a.text() for a in self.watched_action_group.actions() if a.isChecked()]
+        status = [a.text() for a in self.status_action_group.actions() if a.isChecked()]
+        folder_operator = self.folder_size_combo.currentText()
+        folder_size = self.folder_size_value.value()
+        return {"title": title, "quality": quality, "rating": rating, "genre": genre, "watched": watched, "status": status, "folder_operator": folder_operator, "folder_size": folder_size}
+
+    def setupMenus(self):
+        self.quality_menu = QMenu()
+        self.quality_action_group = QActionGroup(self)
+        self.quality_action_group.setExclusive(False)
+        for quality in utils.QUALITY:
+            action = QAction(quality, self)
+            action.setCheckable(True)
+            action.setChecked(False)
+            self.quality_action_group.addAction(action)
+            self.quality_menu.addAction(action)
+        self.quality.setMenu(self.quality_menu)
+        self.genre_menu = QMenu()
+        self.genre_action_group = QActionGroup(self)
+        self.genre_action_group.setExclusive(False)
+        for genre in utils.GENRES:
+            action = QAction(genre, self)
+            action.setCheckable(True)
+            action.setChecked(False)
+            self.genre_action_group.addAction(action)
+            self.genre_menu.addAction(action)
+        self.genre.setMenu(self.genre_menu)
+        self.rating_menu = QMenu()
+        self.rating_action_group = QActionGroup(self)
+        self.rating_action_group.setExclusive(False)
+        for rating in ["0.5", "1.0", "1.5", "2.0", "2.5", "3.0", "3.5", "4.0", "4.5", "5.0"]:
+            action = QAction(rating, self)
+            action.setCheckable(True)
+            action.setChecked(False)
+            self.rating_action_group.addAction(action)
+            self.rating_menu.addAction(action)
+        self.rating.setMenu(self.rating_menu)
+        self.watched_menu = QMenu()
+        self.watched_action_group = QActionGroup(self)
+        self.watched_action_group.setExclusive(False)
+        for status in ["watched", "unwatched"]:
+            action = QAction(status, self)
+            action.setCheckable(True)
+            action.setChecked(False)
+            self.watched_action_group.addAction(action)
+            self.watched_menu.addAction(action)
+        self.watched.setMenu(self.watched_menu)
+        self.status_menu = QMenu()
+        self.status_action_group = QActionGroup(self)
+        self.status_action_group.setExclusive(False)
+        for status in utils.STATUS:
+            action = QAction(status, self)
+            action.setCheckable(True)
+            action.setChecked(False)
+            self.status_action_group.addAction(action)
+            self.status_menu.addAction(action)
+        self.status.setMenu(self.status_menu)
+
 class MediaPage(QWidget):
     toHome = Signal()
 
@@ -127,8 +264,16 @@ class MediaPage(QWidget):
         super().__init__(parent=parent)
         self._table = table
         self.layout = QVBoxLayout(self)
+        self.splitter2 = QSplitter(Qt.Orientation.Vertical)
+        self.layout.addWidget(self.splitter2)
+        self.toolbar = ToolBar(self)
+        self.toolbar.somethingChanged.connect(self.filter_table)
+        self.splitter2.addWidget(self.toolbar)
+        self.widget = QWidget()
+        self.splitter2.addWidget(self.widget)
+        layout1 = QVBoxLayout(self.widget)
         self.splitter = QSplitter()
-        self.layout.addWidget(self.splitter)
+        layout1.addWidget(self.splitter)
         self.table = TableView(table, MAPPING)
         self.table.setColumnMenu(utils.ColumnMenu)
         self.splitter.addWidget(self.table)
@@ -136,6 +281,10 @@ class MediaPage(QWidget):
         self.splitter.splitterMoved.connect(self.updateSplitterSizes)
         self.splitter.setSizes(json.loads(setting("splittersize")))
         self.add_extras()
+
+    def filter_table(self):
+        filters = self.toolbar.gather_values()
+        self.table.filter(filters)
 
     def add_extras(self):
         self.addMediaProfile()
@@ -147,7 +296,11 @@ class MediaPage(QWidget):
         self.table.selectRow(0)
 
     def onFieldChanged(self, field, value):
-        current = self.table.selectionModel().selectedRows()[0]
+        current = self.table.selectionModel().selectedRows()
+        if not current:
+            return
+        else:
+            current = current[0]
         row = self.table.model().mapToSource(current)
         data = self.table.tableModel().getRow(row)
         foldername = data["foldername"]
@@ -215,7 +368,7 @@ class Watched(QWidget):
         self.layout.addWidget(self.checkbox)
 
     def setText(self, value):
-        if value in ["True", "true", True, 1, "1"]:
+        if value in ["True", "true", True, 1, "1", "watched"]:
             self.checkbox.setChecked(True)
         else:
             self.checkbox.setChecked(False)
@@ -381,43 +534,40 @@ class FieldLabel(QLabel):
             if msgbox and msgbox[0]:
                 self.fieldChanged.emit(msgbox[0])
         elif self._text.lower() in ["quality"]:
-            lst = utils.QUALITY.values()
+            lst = utils.QUALITY
             msgbox = QInputDialog.getItem(self, "Edit " + self._text, self._text, lst, 0, False)
             if msgbox and msgbox[0]:
-                for k,v in utils.QUALITY.items():
-                    if msgbox[0] == v:
-                        self.fieldChanged.emit(k)
-                        break
+                self.fieldChanged.emit(msgbox[0])
         elif self._text.lower() == "rating":
             menu = QMenu()
-            action_05 = QAction(".5", self)
+            action_05 = QAction("0.5", self)
             menu.addAction(action_05)
             action_05.triggered.connect(lambda: self.fieldChanged.emit(str(.5)))
-            action_1 = QAction("1", self)
+            action_1 = QAction("1.0", self)
             menu.addAction(action_1)
             action_1.triggered.connect(lambda: self.fieldChanged.emit(str(1)))
             action_105 = QAction("1.5", self)
             menu.addAction(action_105)
             action_105.triggered.connect(lambda: self.fieldChanged.emit(str(1.5)))
-            action_2 = QAction("2", self)
+            action_2 = QAction("2.0", self)
             menu.addAction(action_2)
             action_2.triggered.connect(lambda: self.fieldChanged.emit(str(2)))
             action_205 = QAction("2.5", self)
             menu.addAction(action_205)
             action_205.triggered.connect(lambda: self.fieldChanged.emit(str(2.5)))
-            action_3 = QAction("3", self)
+            action_3 = QAction("3.0", self)
             menu.addAction(action_3)
             action_3.triggered.connect(lambda: self.fieldChanged.emit(str(3)))
             action_305 = QAction("3.5", self)
             menu.addAction(action_305)
             action_305.triggered.connect(lambda: self.fieldChanged.emit(str(3.5)))
-            action_4 = QAction("4", self)
+            action_4 = QAction("4.0", self)
             menu.addAction(action_4)
             action_4.triggered.connect(lambda: self.fieldChanged.emit(str(4)))
             action_405 = QAction("4.5", self)
             menu.addAction(action_405)
             action_405.triggered.connect(lambda: self.fieldChanged.emit(str(4.5)))
-            action_5 = QAction("5", self)
+            action_5 = QAction("5.0", self)
             menu.addAction(action_5)
             action_5.triggered.connect(lambda: self.fieldChanged.emit(str(5)))
             menu.exec(QCursor.pos())

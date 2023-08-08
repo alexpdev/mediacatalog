@@ -76,7 +76,11 @@ QToolBar,
 QStatusBar
 {
     color: rgba(25, 25, 25, 255);
-    spacing: 0;
+    spacing: 15;
+    padding: 3px;
+    margin-top: 2px;
+    margin-bottom: 2px;
+
 }
 QToolBar
 {
@@ -116,14 +120,10 @@ QToolButton:checked
 }
 QToolBar::separator
 {
-    margin-top: 5px;
-    margin-bottom: 5px;
+    margin-top: 2px;
+    margin-bottom: 2px;
     background-color: rgba(205, 205, 205, 255);
-    width: 1px;
-}
-QToolBar QToolButton
-{
-    width: 24px;
+    width: 2px;
 }
 QMenuBar
 {

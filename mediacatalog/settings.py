@@ -2,7 +2,7 @@ from pathlib import Path
 import json
 import os
 
-from mediacatalog.utils import geticon, MAPPING
+from mediacatalog.utils import MAPPING
 
 from PySide6.QtWidgets import *
 from PySide6.QtCore import *
@@ -54,9 +54,11 @@ class GroupBox(QGroupBox):
             self.list.addItem(path)
 
     def choose_folder(self):
-        dialog = DirectorySelectionDialog()
-        dialog.selectionMade.connect(self.add_folder)
-        dialog.exec()
+        result = QFileDialog.getExistingDirectory(self, "Choose Root Directory")
+        print(result)
+        if result:
+            self.add_folder(result)
+
 
     def onChange(self):
         items = [self.list.item(i) for i in range(self.list.count())]
@@ -164,6 +166,11 @@ class Settings(QWidget):
         super().__init__(parent=parent)
         self.setDatabase(db)
         self.layout = QVBoxLayout(self)
+        self.toolbar = QToolBar()
+        self.backAction = QAction("<-", self)
+        self.toolbar.addAction(self.backAction)
+        self.layout.addWidget(self.toolbar)
+        self.backAction.triggered.connect(self.toHome.emit)
         self.deep_reset_checkbox = QCheckBox("Deep Refresh Mode")
         self.reset_database_button = QPushButton("Reset Database")
         self.refresh_database_button = QPushButton("Refresh Database")
@@ -247,8 +254,8 @@ class DirectorySelectionDialog(QDialog):
         self.setObjectName("SelectDir")
         self.setMinimumSize(200, 300)
         self.model = QFileSystemModel(parent=self)
-        self.model.setFilter(QDir.AllDirs | QDir.NoDotAndDotDot)
-        root_index = self.model.setRootPath(self.model.myComputer())
+        self.model.setFilter(QDir.AllDirs | QDir.NoDotAndDotDot | QDir.Hidden)
+        root_index = self.model.setRootPath("////")
         self.tree_view = QTreeView(parent=self)
         self.tree_view.setModel(self.model)
         self.tree_view.setSelectionMode(QAbstractItemView.SingleSelection)

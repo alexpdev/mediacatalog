@@ -16,23 +16,40 @@ class Window(QMainWindow):
         super().__init__(parent=parent)
         self.setObjectName("MainWindow")
         self.setWindowTitle("Fuzzy's Media Manager")
+        self.setWindowIcon(geticon("popcorn"))
+        self.central = QStackedWidget()
         self.db = SqlDatabase(LOCAL / "media.db")
         self.setWindowIcon(geticon("popcorn"))
-        self.central = QTabWidget(parent=self)
+        self.tabs = QTabWidget(parent=self)
         self.settings = Settings(self.db, self)
         self.settings.databaseReset.connect(self.onDbReset)
         self.movies = MediaPage("movies", self)
         self.tv = TvPage("tv", self)
         self.ufc = MediaPage("ufc", self)
-        self.central.addTab(self.movies, "Movies")
+        self.tabs.addTab(self.movies, "Movies")
         self.documentaries = MediaPage("documentaries", self)
-        self.central.addTab(self.tv, "TV")
-        self.central.addTab(self.ufc, "UFC")
-        self.central.addTab(self.documentaries, "Documentaries")
-        self.central.addTab(self.settings, "Settings")
+        self.tabs.addTab(self.tv, "TV")
+        self.tabs.addTab(self.ufc, "UFC")
+        self.tabs.addTab(self.documentaries, "Documentaries")
+        self.central.addWidget(self.tabs)
+        self.central.addWidget(self.settings)
+        self.menubar = self.menuBar()
+        self.filemenu = QMenu("File")
+        self.exitAction = QAction("Exit", self)
+        self.exitAction.triggered.connect(self.close)
+        self.settingsAction = QAction("Settings", self)
+        self.filemenu.addAction(self.settingsAction)
+        self.filemenu.addSeparator()
+        self.filemenu.addAction(self.exitAction)
+        self.settingsAction.triggered.connect(self.openSettings)
+        self.settings.toHome.connect(self.onToHome)
+        self.menubar.addMenu(self.filemenu)
         self.setCentralWidget(self.central)
         self.settings.somethingChanged.connect(self.update_tables)
         self.resize(1500, 900)
+
+    def onToHome(self):
+        self.central.setCurrentWidget(self.tabs)
 
     def onDbReset(self):
         del self.db
@@ -46,6 +63,10 @@ class Window(QMainWindow):
 
     def setSetting(self, key, value):
         self.db.setSetting(key, value)
+
+    def openSettings(self):
+        self.central.setCurrentWidget(self.settings)
+
 
 
 def execute():

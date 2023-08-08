@@ -230,7 +230,7 @@ class SqlDatabase:
         )
         cursor.execute(
             "INSERT INTO settings VALUES(?, ?)",
-            ("quality", json.dumps(list(QUALITY.keys()))),
+            ("quality", json.dumps(QUALITY)),
         )
         cursor.execute(
             "INSERT INTO settings VALUES(?, ?)", ("splittersize", json.dumps([600, 0]))

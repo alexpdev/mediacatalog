@@ -5,10 +5,10 @@ from PySide6.QtCore import *
 from PySide6.QtGui import *
 
 from mediacatalog.utils import geticon
-from mediacatalog.db import Diff, getData
-from mediacatalog.settings import setting, setSetting
+from mediacatalog.db import Diff
+from mediacatalog.settings import setting, setSetting, getData
 
-class SqlTableModel(QAbstractTableModel):
+class TableModel(QAbstractTableModel):
     def __init__(self, table, mapping, fields=None, parent=None):
         super().__init__(parent=parent)
         self._table = table
@@ -16,11 +16,58 @@ class SqlTableModel(QAbstractTableModel):
         self._mapping = mapping
         self._reverse = {v: k for k, v in mapping.items()}
         self._headers_labels = None
+        self._last_filters = None
         self._headers = None
+        self._master = []
         self._data = []
         self.refreshHeaders()
         if fields is None:
             self.getData()
+
+    def apply_filters(self, filters=None):
+        if filters is None and self._last_filters is None:
+            return
+        if filters is None:
+            filters = self._last_filters
+        data = []
+        for record in self._master:
+            print(record)
+            print(filters["title"])
+            if filters["title"] and filters["title"].lower() not in record["title"].lower():
+
+                continue
+            if filters["quality"] and record["quality"] not in filters["quality"]:
+                continue
+            if filters["rating"] and record["rating"] not in filters["rating"]:
+                continue
+            found = False
+            if filters["genre"]:
+                for genre in record["genre"]:
+                    if genre in filters["genre"]:
+                        found = True
+                        break
+            if not found:
+                continue
+            if filters["watched"] and record["watched"] not in filters["watched"]:
+                continue
+            if filters["status"] and record["status"] not in filters["status"]:
+                continue
+            if filters["folder_operator"] and filters["folder_size"]:
+                operator = filters["folder_operator"]
+                size = filters["folder_size"]
+                record_size = record["foldersize"]
+                if operator == "=" and int(size) != int(record_size):
+                    continue
+                elif operator == ">" and int(size) < int(record_size):
+                    continue
+                elif operator == "<" and int(size) > int(record_size):
+                    continue
+            data.append(record)
+        self.beginResetModel()
+        self._data = data
+        self.endResetModel()
+
+
 
     def clearRows(self):
         rows = self.rowCount(QModelIndex()) - 1
@@ -43,6 +90,7 @@ class SqlTableModel(QAbstractTableModel):
     def insertRow(self, row, value, parent=QModelIndex()):
         self.beginInsertRows(parent, row, row)
         self._data.insert(row, value)
+        self._master.insert(row, value)
         self.endInsertRows()
 
     def getRow(self, index):
@@ -77,6 +125,8 @@ class SqlTableModel(QAbstractTableModel):
             path, foldername, data = record
             data = json.loads(data)
             self.insertRow(self.rowCount(QModelIndex()), data, QModelIndex())
+            self.apply_filters()
+
 
     def rowCount(self, _) -> int:
         return len(self._data)
@@ -141,7 +191,7 @@ class TableView(QTableView):
         super().__init__(parent=parent)
         self._table = table
         self._fields = fields if fields is not None else table
-        self._model = SqlTableModel(self._table, mapping, fields=fields)
+        self._model = TableModel(self._table, mapping, fields=fields)
         self._proxy_model = QSortFilterProxyModel()
         self.setModel(self._proxy_model)
         self._proxy_model.setSourceModel(self._model)
@@ -157,8 +207,6 @@ class TableView(QTableView):
         self.setSortingEnabled(True)
         self.columnMenu = None
         self.labels = json.loads(setting(self._fields + "columnfields"))
-
-
 
     def setColumnMenu(self, menu):
         self.columnMenu = menu()
@@ -178,6 +226,9 @@ class TableView(QTableView):
 
     def tableModel(self):
         return self._model
+
+    def filter(self, filters):
+        self.tableModel().apply_filters(filters)
 
 
 class CheckBoxDelegate(QStyledItemDelegate):

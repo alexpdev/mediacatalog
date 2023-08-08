@@ -71,6 +71,12 @@ MAPPING = {
     "pin": "Pin",
 }
 
+STATUS = [
+    "Active",
+    "Deleted",
+    "New",
+]
+
 GENRES = [
     "Action",
     "Adventure",
@@ -112,21 +118,20 @@ GENRES = [
     "Blank",
 ]
 
-QUALITY = {
-    "WQ": "Worst Quality",
-    "LQ": "Low Quality",
-    "SQ": "Standard Quality",
-    "HQ": "High Quality (~720P)",
-    "BQ": "Best Quality (>= 1080p)",
-    "TB": "Too Big for Quality",
-    "NU": "Needs Upgrade",
-    "MSU": "Missing Subs",
-    "HCS": "Hard Coded Subs",
-    "BFF": "Bad File Format",
-    "WL": "Wrong Language",
-    "SYNC": "Off Sync",
-    "": "Blank",
-}
+QUALITY = [
+    "[WQ] Worst Quality",
+    "[LQ] Low Quality",
+    "[SQ] Standard Quality",
+    "[HQ] High Quality (~720P)",
+    "[BQ] Best Quality (>= 1080p)",
+    "[TB] Too Big for Quality",
+    "[NU] Needs Upgrade",
+    "[MSU] Missing Subs",
+    "[HCS] Hard Coded Subs",
+    "[BFF] Bad File Format",
+    "[WL] Wrong Language",
+    "[SYNC] Off Sync",
+]
 
 
 def nfo_to_dict(content):
@@ -161,9 +166,11 @@ def nfo_to_dict(content):
     record["lastviewed"] = ""
     record["comments"] = ""
     record["quality"] = ""
-    record["watched"] = False
+    record["watched"] = "unwatched"
     record["actors"] = []
     record["pin"] = False
+    if record["status"] is None:
+        record["status"] = "Active"
     if record["userrating"] is None:
         record["userrating"] = 0
     if record["playcount"] is None:
