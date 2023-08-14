@@ -5,7 +5,7 @@ from PySide6.QtGui import *
 from mediacatalog.db import SqlDatabase
 from mediacatalog.style import style
 from mediacatalog.utils import geticon, LOCAL
-from mediacatalog.settings import Settings
+from mediacatalog.settings import SettingsWidget
 from mediacatalog.mediapage import MediaPage, TvPage
 
 
@@ -21,7 +21,7 @@ class Window(QMainWindow):
         self.db = SqlDatabase(LOCAL / "media.db")
         self.setWindowIcon(geticon("popcorn"))
         self.tabs = QTabWidget(parent=self)
-        self.settings = Settings(self.db, self)
+        self.settings = SettingsWidget(self.db, self)
         self.settings.databaseReset.connect(self.onDbReset)
         self.movies = MediaPage("movies", self)
         self.tv = TvPage("tv", self)
@@ -46,7 +46,7 @@ class Window(QMainWindow):
         self.menubar.addMenu(self.filemenu)
         self.setCentralWidget(self.central)
         self.settings.somethingChanged.connect(self.update_tables)
-        self.resize(1500, 900)
+        self.resize(1300, 700)
 
     def onToHome(self):
         self.central.setCurrentWidget(self.tabs)
@@ -57,7 +57,6 @@ class Window(QMainWindow):
 
     def update_tables(self):
         for page in [self.movies, self.tv, self.ufc, self.documentaries]:
-            page.table.tableModel().refreshHeaders()
             page.table.tableModel().getData()
             page.table.selectRow(0)
 

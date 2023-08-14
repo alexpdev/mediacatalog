@@ -77,6 +77,10 @@ STATUS = [
     "New",
 ]
 
+RATING = [
+    "0.0", "0.5", "1.0", "1.5", "2.0", "2.5", "3.0", "3.5", "4.0", "4.5", "5.0"
+]
+
 GENRES = [
     "Action",
     "Adventure",
@@ -142,8 +146,6 @@ def nfo_to_dict(content):
     record["runtime"] = selector.xpath("//runtime/text()").get()
     record["userrating"] = selector.xpath("//userrating/text()").get()
     record["tagline"] = selector.xpath("//tagline/text()").get()
-    record["movie"] = selector.xpath("//movie").get() is not None
-    record["tv"] = selector.xpath("//tvshow").get() is not None
     record["mpaa"] = selector.xpath("//mpaa/text()").get()
     record["playcount"] = selector.xpath("//playcount/text()").get()
     record["imdb"] = selector.xpath("//uniqueid[@type='imdb']/text()").get()
@@ -169,6 +171,8 @@ def nfo_to_dict(content):
     record["watched"] = "unwatched"
     record["actors"] = []
     record["pin"] = False
+    if record["runtime"] is None:
+        record["runtime"] = 0
     if record["status"] is None:
         record["status"] = "Active"
     if record["userrating"] is None:
@@ -490,11 +494,9 @@ class ColumnMenu(QMenu):
         self._reverse = {val: key for key, val in MAPPING.items()}
 
     def columnToggled(self, text):
-        key = self._reverse[text]
-        self.menuItemToggled.emit(key)
+        self.menuItemToggled.emit(text)
 
     def setCheckedItems(self, lst):
         for action in self.actions():
-            key = self._reverse[action.text()]
-            if key in lst:
+            if action.text() in lst:
                 action.setChecked(True)

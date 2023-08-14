@@ -599,7 +599,8 @@ QSplitter::handle
     margin: 1px;
 }
 QWidget[class="scrollBack"] {
-    background-image: url('./assets/wooden-texture.png') 0 0 0 0 stretch stretch;
+    /* background-image: url('./assets/wooden-texture.png') 0 0 0 0 stretch stretch; */
+    background-color: #eee;
 }
 QLabel:disabled,
 QCheckBox:disabled,
@@ -612,6 +613,12 @@ QMenu::item:disabled,
 QMenuBar::item:disabled
 {
     color: rgba(115, 115, 115, 255);
+}
+QScrollArea QWidget {
+    background-color: #eee;
+}
+QScrollArea QLineEdit {
+
 }
 QLineEdit:disabled,
 QComboBox:disabled,
@@ -626,21 +633,26 @@ QToolButton:disabled
     background-color: rgba(235, 235, 235, 255);
 }
 QWidget[class="fieldWidget"] {
-    background-color: #444;
-    border: 1px outset #F00;
+    border: 1px solid #EEE;
 }
 QWidget[class="ratingWidget"],
 QWidget[class="genreWidget"] {
-    background-color: #CCC;
+    background-color: #EEE;
 }
 QLabel[class="field"] {
+    background-color: #00AAEE;
+    border-radius: 3px;
     font-size: 8pt;
-    color: #FFF;
+    font-weight: bold;
+    border-bottom: 1px solid black;
+    color: #000;
 }
 QPlainTextEdit[class="fieldtextedit"],
 QLineEdit[class="fieldedit"] {
     background-color: #CCC;
     color: #000;
+    border: 2px transparent solid;
+    border-bottom: 2px solid black;
     font-size: 11pt;
     margin-top: 1px;
     margin-bottom: 1px;

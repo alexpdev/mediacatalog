@@ -2,31 +2,50 @@ from pathlib import Path
 import json
 import os
 
-from mediacatalog.utils import MAPPING
+from mediacatalog.utils import MAPPING, EPISODE, SEASON, GENRES, QUALITY
 
 from PySide6.QtWidgets import *
 from PySide6.QtCore import *
 from PySide6.QtGui import *
 
-
-class DbSql:
+class Settings:
+    default = {
+        'movies': [],
+        "tv": [],
+        "ufc": [],
+        "documentaries":[],
+        "documentariesprofilefields": list(MAPPING.keys()),
+        "moviesprofilefields": list(MAPPING.keys()),
+        "tvprofilefields": list(MAPPING.keys()),
+        "ufcprofilefields": list(MAPPING.keys()),
+        "documentariescolumnfields": list(MAPPING.keys()),
+        "moviescolumnfields": list(MAPPING.keys()),
+        "tvcolumnfields": list(MAPPING.keys()),
+        "ufccolumnfields": list(MAPPING.keys()),
+        "episodecolumnfields": list(EPISODE.keys()),
+        "seasoncolumnfields": list(SEASON.keys()),
+        "genres": GENRES,
+        "quality": QUALITY,
+        "windowsize": (1300, 700),
+        "splittersize1": [700,0],
+        "splittersize2": [700,0]
+    }
+    current = None
     db = None
 
 
 def setting(key):
-    return DbSql.db.setting(key)
-
+    return Settings.current[key]
 
 def setSetting(key, value):
-    DbSql.db.setSetting(key, value)
-
+    Settings.current[key] = value
+    Settings.db.set_settings(Settings.current)
 
 def updateField(table, foldername, key, value):
-    DbSql.db.updateField(table, foldername, key, value)
-
+    Settings.db.updateField(table, foldername, key, value)
 
 def getData(table):
-    return DbSql.db.getData(table)
+    return Settings.db.getData(table)
 
 
 class GroupBox(QGroupBox):
@@ -50,20 +69,21 @@ class GroupBox(QGroupBox):
 
     def refresh_list(self):
         contents = setting(self._title.lower())
-        for path in json.loads(contents):
+        for path in contents:
             self.list.addItem(path)
 
     def choose_folder(self):
         result = QFileDialog.getExistingDirectory(self, "Choose Root Directory")
-        print(result)
         if result:
-            self.add_folder(result)
+            result = Path(result).resolve()
+            self.add_folder(str(result))
 
 
     def onChange(self):
         items = [self.list.item(i) for i in range(self.list.count())]
         paths = [item.text() for item in items if item and item.text()]
-        self.somethingChanged.emit(self._title.lower(), json.dumps(paths))
+        key = self._title.lower()
+        setSetting(key, paths)
 
     def add_folder(self, path):
         self.list.addItem(path)
@@ -98,18 +118,20 @@ class TagBox(QGroupBox):
 
     def refresh_list(self):
         options = setting(self._field)
-        for option in json.loads(options):
+        for option in options:
             self.list.addItem(option)
 
     def onChange(self):
         items = [self.list.item(i) for i in range(self.list.count())]
         paths = [item.text() for item in items if item and item.text()]
-        self.somethingChanged.emit(self._field.lower(), json.dumps(paths))
+        self.somethingChanged.emit(self._field.lower(), paths)
 
     def add_field(self):
         text = QInputDialog.getText(self, f"Enter {self._field}", f"{self._field}")
         if text:
-            self.list.addItem(text)
+            path = text.replace("/", "\\")
+            print(path, text)
+            self.list.addItem(path)
             self.onChange()
 
     def remove_field(self):
@@ -133,7 +155,7 @@ class FieldBox(QGroupBox):
         self.refresh_list()
 
     def refresh_list(self):
-        options = json.loads(setting(self._field))
+        options = setting(self._field)
         for key, value in MAPPING.items():
             item = QListWidgetItem()
             item.setText(value)
@@ -154,10 +176,10 @@ class FieldBox(QGroupBox):
         for key, value in MAPPING.items():
             if value in paths:
                 fields.append(key)
-        self.somethingChanged.emit(self._field.lower(), json.dumps(fields))
+        self.somethingChanged.emit(self._field.lower(), fields)
 
 
-class Settings(QWidget):
+class SettingsWidget(QWidget):
     toHome = Signal()
     somethingChanged = Signal()
     databaseReset = Signal()
@@ -227,21 +249,23 @@ class Settings(QWidget):
             box.somethingChanged.connect(self.update_settings)
 
     def setDatabase(self, db):
-        DbSql.db = db
+        Settings.db = db
+        Settings.current = db.settings()
 
     def onResetDatabase(self):
-        os.remove(DbSql.db.path)
+        os.remove(Settings.db.path)
         self.databaseReset.emit()
 
     def onRefreshDatabase(self):
         if self.deep_reset_checkbox.isChecked():
-            DbSql.db.refresh_database(deep=True)
+            Settings.db.refresh_database(deep=True)
         else:
-            DbSql.db.refresh_database()
+            Settings.db.refresh_database()
+        self.somethingChanged.emit()
 
     def update_settings(self, key, value):
         setSetting(key, value)
-        DbSql.db.refresh_database()
+        Settings.db.refresh_database()
         self.somethingChanged.emit()
 
 

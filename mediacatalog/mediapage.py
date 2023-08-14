@@ -92,7 +92,7 @@ class MediaProfile(QWidget):
         )
 
     def setCurrent(self, data):
-        fields = json.loads(setting(self._table + "profilefields"))
+        fields = setting(self._table + "profilefields")
         self.images = data["images"]
         if self.images:
             self._current = self.images[0]
@@ -279,7 +279,7 @@ class MediaPage(QWidget):
         self.splitter.addWidget(self.table)
         self.table.selectionModel().currentRowChanged.connect(self.onRowChanged)
         self.splitter.splitterMoved.connect(self.updateSplitterSizes)
-        self.splitter.setSizes(json.loads(setting("splittersize")))
+        self.splitter.setSizes(setting("splittersize1"))
         self.add_extras()
 
     def filter_table(self):
@@ -310,7 +310,7 @@ class MediaPage(QWidget):
         self.table.tableModel().dataChanged.emit(row, row)
 
     def updateSplitterSizes(self, *args):
-        setSetting("splittersize", json.dumps(args))
+        setSetting("splittersize1", self.splitter.sizes())
 
     def onRowChanged(self, current, previous):
         row = self.table.model().mapToSource(current)
@@ -427,6 +427,10 @@ class RatingWidget(QWidget):
         self._widget_layout.setSpacing(0)
         pixmap = QPixmap(utils.getimage("star")).scaledToHeight(30)
         halfpixmap = QPixmap(utils.getimage("halfstar")).scaledToHeight(30)
+        if text is None:
+            text = 0
+        if text == "None":
+            text = 0
         count = float(text)
         while count > .5:
             label = QLabel()
@@ -449,7 +453,7 @@ class PlainTextEdit(QPlainTextEdit):
         super().__init__(parent=parent)
         self._parent = parent
         self.setReadOnly(True)
-        self.setMaximumHeight(65)
+        self.setMaximumHeight(45)
         self.setProperty("class", "fieldtextedit")
 
     def text(self):
@@ -488,7 +492,7 @@ class GenreWidget(QWidget):
         self._widget_layout = QHBoxLayout(self._widget)
         self._widget_layout.setContentsMargins(0, 0, 0, 0)
         self._widget_layout.setSpacing(0)
-        for item in text.split(";"):
+        for item in text:
             label = QLabel(item)
             label.setSizePolicy(QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Maximum)
             label.setProperty("class", "genre")
@@ -506,6 +510,10 @@ class FieldLabel(QLabel):
         self._text = text
         self._parent = parent
 
+    # def minimumSizeHint(self):
+    #     size = super().minimumSizeHint()
+    #     return QSize(size.width(), self._parent.height())
+
     def mouseDoubleClickEvent(self, event: QMouseEvent) -> None:
         if self._text.lower() in ["pin"]:
             value = QMessageBox.question(self, self._text, "Add to Pinned Items?", QMessageBox.StandardButton.Yes, QMessageBox.StandardButton.No)
@@ -513,7 +521,7 @@ class FieldLabel(QLabel):
                 self.fieldChanged.emit("true")
             else:
                 self.fieldChange.emit("false")
-        elif self._text.lower() in [ "season", "episode",  "nfo", "path", "folder name", "folder size"]:
+        elif self._text.lower() in [ "season", "episode", "nfo", "path", "folder name", "folder size"]:
             pass
         elif self._text.lower() in ["imdb", "title", "plot", "tag line","country", "director", "year", "trailer", "studio", "status", "content\nrating", "comments"]:
             msgbox = QInputDialog.getText(
@@ -538,6 +546,8 @@ class FieldLabel(QLabel):
             msgbox = QInputDialog.getItem(self, "Edit " + self._text, self._text, lst, 0, False)
             if msgbox and msgbox[0]:
                 self.fieldChanged.emit(msgbox[0])
+        elif self._text.lower() == "genre":
+            self.open_genre_dialog()
         elif self._text.lower() == "rating":
             menu = QMenu()
             action_05 = QAction("0.5", self)
@@ -571,12 +581,50 @@ class FieldLabel(QLabel):
             menu.addAction(action_5)
             action_5.triggered.connect(lambda: self.fieldChanged.emit(str(5)))
             menu.exec(QCursor.pos())
-
         return super().mouseDoubleClickEvent(event)
 
     def setFieldChange(self, value):
         print(value, type(value))
         self.fieldChanged.emit(value)
+
+    def open_genre_dialog(self):
+        self.dialog = GenreDialog()
+        self.dialog.genreSelected.connect(self.onGenreSelected)
+        self.dialog.exec()
+
+    def onGenreSelected(self, lst):
+        self._parent.setText(lst)
+
+class GenreDialog(QDialog):
+    genreSelected = Signal(list)
+    def __init__(self, parent=None):
+        super().__init__(parent=parent)
+        self.grid = QGridLayout(self)
+        genres = setting("genres")
+        row = column = 0
+        self.checkboxes = []
+        for genre in genres:
+            checkbox = QCheckBox(genre, self)
+            self.grid.addWidget(checkbox, row, column)
+            self.checkboxes.append(checkbox)
+            if column == 3:
+                column = 0
+                row += 1
+            else:
+                column += 1
+
+    def closeEvent(self, event):
+        genres = []
+        for checkbox in self.checkboxes:
+            if checkbox.isChecked():
+                genres.append(checkbox.text())
+        self.genreSelected.emit(genres)
+        self.close()
+
+
+
+
+
 
 class DateDialog(QDialog):
     chosen = Signal(str)
@@ -616,7 +664,7 @@ class FieldWidget(QWidget):
         self.label = FieldLabel(field, self)
         self.label.setProperty("class", "field")
         self.label.setFixedWidth(68)
-        self.label.setAlignment(Qt.AlignmentFlag.AlignHCenter)
+        self.label.setAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignHCenter)
         self.layout = QFormLayout(self)
         self.layout.setSpacing(0)
         self.layout.setContentsMargins(0, 0, 0, 0)
@@ -654,6 +702,6 @@ class FieldWidget(QWidget):
 
     def setText(self, text):
         self._value = text
-        self.line.setText(str(text))
+        self.line.setText(text)
         if isinstance(self.line, LineEdit):
             self.line.setCursorPosition(0)

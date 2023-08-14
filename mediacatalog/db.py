@@ -1,5 +1,6 @@
 import os
 import datetime
+import pathlib
 import sqlite3
 import json
 import shutil
@@ -9,7 +10,8 @@ from PySide6.QtWidgets import *
 from PySide6.QtCore import *
 from PySide6.QtGui import *
 
-from mediacatalog.utils import nfo_to_dict, QUALITY, GENRES, MAPPING, EPISODE, SEASON
+from mediacatalog.utils import nfo_to_dict, MAPPING
+from mediacatalog.settings import Settings, setting
 
 
 class Diff:
@@ -47,6 +49,8 @@ def find_image_files(path):
 
 
 def find_nfo(path):
+    if not os.path.isdir(path):
+        return None
     for item in os.listdir(path):
         if os.path.splitext(item)[-1].lower() == ".nfo":
             return os.path.join(path, item)
@@ -55,7 +59,7 @@ def find_nfo(path):
 
 def scan_seasons(path):
     seasons = {}
-    for name in os.listdir(path):
+    for name in os.listdir(os.path.realpath(path)):
         fullpath = os.path.join(path, name)
         if name.lower().startswith("season") and os.path.isdir(fullpath):
             seasons[fullpath] = {
@@ -77,6 +81,8 @@ def scan_seasons(path):
 
 def scan_videos(path):
     video_files = []
+    if not os.path.isdir(path):
+        return None
     for name in os.listdir(path):
         if os.path.splitext(name)[-1].lower() in [
             ".avi",
@@ -128,27 +134,40 @@ def scan_media(path, category, paths, deep=False):
 
 
 class SqlDatabase:
+
     def __init__(self, path):
         self.path = path
+        self.missing_content = []
         self.imagedir = os.path.join(os.path.dirname(path), "imgs")
         self.setup_database(path)
         self.conn = sqlite3.connect(path)
         self.refresh_database()
 
-    def setSetting(self, key, value):
-        curs = self.conn.cursor()
-        curs.execute(f'UPDATE settings SET "value" = ? WHERE "key" = ?', (value, key))
+    def settings(self):
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT * FROM settings")
+        settings_row = cursor.fetchall()
+        settings_dict = json.loads(settings_row[0][1])
+        return settings_dict
+
+    def set_settings(self, settings):
+        cursor = self.conn.cursor()
+        cursor.execute('UPDATE settings SET "value" = ? WHERE "key" = ?', (json.dumps(settings), "settings"))
         self.conn.commit()
-        curs.close()
+
+    def setting(self, key):
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT value FROM settings WHERE key = ?", ("settings",))
+        val = cursor.fetchone()[0]
+        print(val)
+        d = json.loads(val)
+        return d[key]
+
 
     def refresh_database(self, deep=False):
         cursor = self.conn.cursor()
         for key in ["movies", "tv", "ufc", "documentaries"]:
-            cursor.execute("SELECT * FROM settings WHERE key = ?", (key,))
-            value = cursor.fetchone()
-            if not value:
-                continue
-            value = value[1]
+            values = self.setting(key)
             records = []
             cursor.execute(f"SELECT * FROM {key}")
             current = cursor.fetchall()
@@ -159,7 +178,7 @@ class SqlDatabase:
                     self.missing_content.append(path)
                 else:
                     paths.append(path)
-            for val in json.loads(value):
+            for val in values:
                 records += scan_media(val, key, paths, deep=deep)
             for record in records:
                 path = record["path"]
@@ -186,14 +205,7 @@ class SqlDatabase:
                         f"INSERT INTO {key} values(?, ?, ?)",
                         (path, foldername, jsondata),
                     )
-
         self.conn.commit()
-
-    def setting(self, key):
-        cur = self.conn.cursor()
-        cur.execute(f"SELECT * FROM settings WHERE key = ?", (key,))
-        result = cur.fetchall()
-        return result[0][1]
 
     def setup_database(self, path):
         if os.path.exists(path):
@@ -207,34 +219,7 @@ class SqlDatabase:
         cursor.execute("CREATE TABLE ufc(path, foldername, json)")
         cursor.execute("CREATE TABLE documentaries(path, foldername, json)")
         cursor.execute("CREATE TABLE settings(key, value)")
-        for i in ["movies", "tv", "ufc", "documentaries"]:
-            cursor.execute("INSERT INTO settings VALUES(?, ?)", (i, json.dumps([])))
-            cursor.execute(
-                "INSERT INTO settings VALUES(?, ?)",
-                (i + "profilefields", json.dumps(list(MAPPING.keys()))),
-            )
-            cursor.execute(
-                "INSERT INTO settings VALUES(?, ?)",
-                (i + "columnfields", json.dumps(list(MAPPING.keys()))),
-            )
-        cursor.execute(
-            "INSERT INTO settings VALUES(?, ?)",
-            ("episodecolumnfields", json.dumps(list(EPISODE.keys()))),
-        )
-        cursor.execute(
-            "INSERT INTO settings VALUES(?, ?)",
-            ("seasoncolumnfields", json.dumps(list(SEASON.keys()))),
-        )
-        cursor.execute(
-            "INSERT INTO settings VALUES(?, ?)", ("genres", json.dumps(GENRES))
-        )
-        cursor.execute(
-            "INSERT INTO settings VALUES(?, ?)",
-            ("quality", json.dumps(QUALITY)),
-        )
-        cursor.execute(
-            "INSERT INTO settings VALUES(?, ?)", ("splittersize", json.dumps([600, 0]))
-        )
+        cursor.execute("INSERT INTO settings VALUES(?, ?)", ("settings", json.dumps(Settings.default)))
         con.commit()
 
     def updateField(self, table, foldername, key, value):

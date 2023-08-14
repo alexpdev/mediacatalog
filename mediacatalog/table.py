@@ -15,14 +15,16 @@ class TableModel(QAbstractTableModel):
         self._fields = fields if fields is not None else self._table
         self._mapping = mapping
         self._reverse = {v: k for k, v in mapping.items()}
-        self._headers_labels = None
+        self._headers_labels = setting(self._fields + "columnfields")
         self._last_filters = None
-        self._headers = None
+        self._headers = [self._mapping[k] for k in self._headers_labels]
         self._master = []
         self._data = []
-        self.refreshHeaders()
         if fields is None:
             self.getData()
+
+    def headers(self):
+        return self._headers
 
     def apply_filters(self, filters=None):
         if filters is None and self._last_filters is None:
@@ -31,10 +33,7 @@ class TableModel(QAbstractTableModel):
             filters = self._last_filters
         data = []
         for record in self._master:
-            print(record)
-            print(filters["title"])
             if filters["title"] and filters["title"].lower() not in record["title"].lower():
-
                 continue
             if filters["quality"] and record["quality"] not in filters["quality"]:
                 continue
@@ -67,7 +66,13 @@ class TableModel(QAbstractTableModel):
         self._data = data
         self.endResetModel()
 
-
+    def toggleKey(self, key):
+        if key in self._headers:
+            index = self._headers.index(key)
+            self.removeColumn(index, QModelIndex())
+        else:
+            index = list(self._reverse.keys()).index(key)
+            self.insertColumn(index, key, QModelIndex())
 
     def clearRows(self):
         rows = self.rowCount(QModelIndex()) - 1
@@ -95,28 +100,6 @@ class TableModel(QAbstractTableModel):
 
     def getRow(self, index):
         return self._data[index.row()]
-
-    def refreshHeaders(self):
-        headers_labels = json.loads(setting(self._fields + "columnfields"))
-        if self._headers_labels is None:
-            self._headers_labels = headers_labels
-            self._headers = [self._mapping[i] for i in self._headers_labels]
-        elif len(headers_labels) < len(self._headers_labels):
-            idxs = [
-                i
-                for i in range(len(self._headers_labels))
-                if self._headers_labels[i] not in headers_labels
-            ]
-            for idx in idxs:
-                self.removeColumn(idx, QModelIndex())
-        elif len(headers_labels) > len(self._headers_labels):
-            idxs = [
-                i
-                for i in range(len(headers_labels))
-                if headers_labels[i] not in self._headers_labels
-            ]
-            for idx in idxs:
-                self.insertColumn(idx, headers_labels[idx], QModelIndex())
 
     def getData(self):
         self.clearRows()
@@ -177,13 +160,16 @@ class TableModel(QAbstractTableModel):
         self.beginRemoveColumns(parent, column, column)
         del self._headers[column]
         del self._headers_labels[column]
+        setSetting(self._fields + "columnfields", self._headers_labels)
         self.endRemoveColumns()
 
     def insertColumn(self, column, value, parent=QModelIndex()):
-        self.beginRemoveColumns(parent, column, column)
-        self._headers_labels.insert(column, value)
-        self._headers.insert(column, self._mapping[value])
-        self.endRemoveColumns()
+        self.beginInsertColumns(parent, column, column)
+        self._headers_labels.insert(column, self._reverse[value])
+        self._headers.insert(column, value)
+        print(value)
+        setSetting(self._fields + "columnfields", self._headers_labels)
+        self.endInsertColumns()
 
 
 class TableView(QTableView):
@@ -206,22 +192,16 @@ class TableView(QTableView):
         )
         self.setSortingEnabled(True)
         self.columnMenu = None
-        self.labels = json.loads(setting(self._fields + "columnfields"))
 
     def setColumnMenu(self, menu):
         self.columnMenu = menu()
-        self.columnMenu.setCheckedItems(self.labels)
+        self.columnMenu.setCheckedItems(self.tableModel().headers())
+        self.columnMenu.menuItemToggled.connect(self.toggleColumnHeader)
 
     def toggleColumnHeader(self, key):
-        if key in self.labels:
-            self.labels.remove(key)
-        else:
-            self.labels.append(key)
-        setSetting(self._fields + "columnfields", json.dumps(self.labels))
-        self._model.refreshHeaders()
+        self.tableModel().toggleKey(key)
 
     def selectVisibleColumns(self, point):
-        self.columnMenu.menuItemToggled.connect(self.toggleColumnHeader)
         self.columnMenu.popup(self.mapToGlobal(point))
 
     def tableModel(self):
