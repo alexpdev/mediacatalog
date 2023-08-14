@@ -279,8 +279,12 @@ class MediaPage(QWidget):
         self.table.setColumnMenu(utils.ColumnMenu)
         self.splitter.addWidget(self.table)
         self.table.selectionModel().currentRowChanged.connect(self.onRowChanged)
-        self.splitter.setSizes(setting(f"{table}mediaslider"))
-        self.splitter2.setSizes(setting(f"{table}toolbarslider"))
+        slider_size = setting(f"{table}mediaslider")
+        if slider_size:
+            self.splitter.setSizes(slider_size)
+        slider_size = setting(f"{table}toolbarslider")
+        if slider_size:
+            self.splitter2.setSizes(slider_size)
         self.splitter.splitterMoved.connect(self.updateSplitterSizes)
         self.splitter2.splitterMoved.connect(self.updateSplitterSizes)
         self.add_extras()
