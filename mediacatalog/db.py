@@ -159,9 +159,13 @@ class SqlDatabase:
         cursor = self.conn.cursor()
         cursor.execute("SELECT value FROM settings WHERE key = ?", ("settings",))
         val = cursor.fetchone()[0]
-        print(val)
         d = json.loads(val)
         return d[key]
+
+    def set_setting(self, key, value):
+        settings = self.settings()
+        settings[key] = value
+        self.set_settings(settings)
 
 
     def refresh_database(self, deep=False):

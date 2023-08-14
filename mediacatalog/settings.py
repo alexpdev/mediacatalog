@@ -27,8 +27,14 @@ class Settings:
         "genres": GENRES,
         "quality": QUALITY,
         "windowsize": (1300, 700),
-        "splittersize1": [700,0],
-        "splittersize2": [700,0]
+        "documentariestoolbarslider": [],
+        "tvtoolbarslider": [],
+        "moviestoolbarslider": [],
+        "ufctoolbarslider": [],
+        "documentariesmediaslider":[],
+        "moviesmediaslider":[],
+        "ufcmediaslider": [],
+        "tvmediaslider":[]
     }
     current = None
     db = None

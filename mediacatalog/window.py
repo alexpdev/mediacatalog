@@ -46,7 +46,8 @@ class Window(QMainWindow):
         self.menubar.addMenu(self.filemenu)
         self.setCentralWidget(self.central)
         self.settings.somethingChanged.connect(self.update_tables)
-        self.resize(1300, 700)
+        self.resize(*self.db.setting("windowsize"))
+
 
     def onToHome(self):
         self.central.setCurrentWidget(self.tabs)
@@ -61,11 +62,14 @@ class Window(QMainWindow):
             page.table.selectRow(0)
 
     def setSetting(self, key, value):
-        self.db.setSetting(key, value)
+        self.db.set_setting(key, value)
 
     def openSettings(self):
         self.central.setCurrentWidget(self.settings)
 
+    def closeEvent(self, event):
+        self.setSetting("windowsize", list(self.size().toTuple()))
+        super().closeEvent(event)
 
 
 def execute():

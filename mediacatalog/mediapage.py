@@ -62,6 +62,7 @@ class MediaProfile(QWidget):
             self.fields[key] = widget
             self.scrolllayout.addWidget(widget)
 
+
     def onWatched(self):
         self.fieldChanged.emit("Watched", "watched")
         self.fieldChanged.emit("Play Count", "1")
@@ -278,8 +279,10 @@ class MediaPage(QWidget):
         self.table.setColumnMenu(utils.ColumnMenu)
         self.splitter.addWidget(self.table)
         self.table.selectionModel().currentRowChanged.connect(self.onRowChanged)
+        self.splitter.setSizes(setting(f"{table}mediaslider"))
+        self.splitter2.setSizes(setting(f"{table}toolbarslider"))
         self.splitter.splitterMoved.connect(self.updateSplitterSizes)
-        self.splitter.setSizes(setting("splittersize1"))
+        self.splitter2.splitterMoved.connect(self.updateSplitterSizes)
         self.add_extras()
 
     def filter_table(self):
@@ -310,15 +313,13 @@ class MediaPage(QWidget):
         self.table.tableModel().dataChanged.emit(row, row)
 
     def updateSplitterSizes(self, *args):
-        setSetting("splittersize1", self.splitter.sizes())
+        setSetting(f"{self._table}mediaslider", self.splitter.sizes())
+        setSetting(f"{self._table}toolbarslider", self.splitter2.sizes())
 
     def onRowChanged(self, current, previous):
         row = self.table.model().mapToSource(current)
         row = self.table.tableModel().getRow(row)
         self.mediaProfile.setCurrent(row)
-
-
-
 
 class TvPage(MediaPage):
     def __init__(self, table, parent=None):
@@ -510,10 +511,6 @@ class FieldLabel(QLabel):
         self._text = text
         self._parent = parent
 
-    # def minimumSizeHint(self):
-    #     size = super().minimumSizeHint()
-    #     return QSize(size.width(), self._parent.height())
-
     def mouseDoubleClickEvent(self, event: QMouseEvent) -> None:
         if self._text.lower() in ["pin"]:
             value = QMessageBox.question(self, self._text, "Add to Pinned Items?", QMessageBox.StandardButton.Yes, QMessageBox.StandardButton.No)
@@ -538,7 +535,10 @@ class FieldLabel(QLabel):
             msgbox.chosen.connect(self.setFieldChange)
             msgbox.exec()
         elif self._text.lower() in ["runtime", "play\ncount"]:
-            msgbox = QInputDialog.getInt(self, "Edit " + self._text, self._text, int(self._parent.line.text()))
+            value = self._parent.line.text()
+            if not value:
+                value = "0"
+            msgbox = QInputDialog.getInt(self, "Edit " + self._text, self._text, int(value))
             if msgbox and msgbox[0]:
                 self.fieldChanged.emit(msgbox[0])
         elif self._text.lower() in ["quality"]:
@@ -547,7 +547,7 @@ class FieldLabel(QLabel):
             if msgbox and msgbox[0]:
                 self.fieldChanged.emit(msgbox[0])
         elif self._text.lower() == "genre":
-            self.open_genre_dialog()
+            self.open_genre_dialog(self._parent.value())
         elif self._text.lower() == "rating":
             menu = QMenu()
             action_05 = QAction("0.5", self)
@@ -587,8 +587,8 @@ class FieldLabel(QLabel):
         print(value, type(value))
         self.fieldChanged.emit(value)
 
-    def open_genre_dialog(self):
-        self.dialog = GenreDialog()
+    def open_genre_dialog(self, value):
+        self.dialog = GenreDialog(value, self)
         self.dialog.genreSelected.connect(self.onGenreSelected)
         self.dialog.exec()
 
@@ -597,34 +597,42 @@ class FieldLabel(QLabel):
 
 class GenreDialog(QDialog):
     genreSelected = Signal(list)
-    def __init__(self, parent=None):
+    def __init__(self, value, parent=None):
         super().__init__(parent=parent)
-        self.grid = QGridLayout(self)
+        self._value = value
         genres = setting("genres")
-        row = column = 0
-        self.checkboxes = []
+        layout = QVBoxLayout(self)
+        self.listwidget = QListWidget()
+        layout.addWidget(self.listwidget)
+        self.okaybutton = QPushButton("Okay")
+        self.cancelbutton = QPushButton("Cancel")
+        hlayout = QHBoxLayout()
+        hlayout.addWidget(self.okaybutton)
+        hlayout.addWidget(self.cancelbutton)
+        layout.addLayout(hlayout)
+        self.okaybutton.clicked.connect(self.onOkay)
+        self.cancelbutton.clicked.connect(self.onCancel)
         for genre in genres:
-            checkbox = QCheckBox(genre, self)
-            self.grid.addWidget(checkbox, row, column)
-            self.checkboxes.append(checkbox)
-            if column == 3:
-                column = 0
-                row += 1
-            else:
-                column += 1
+            checkbox = QCheckBox(genre)
+            item = QListWidgetItem()
+            self.listwidget.addItem(item)
+            self.listwidget.setItemWidget(item, checkbox)
+            if self._value:
+                if genre in self._value:
+                    checkbox.setChecked()
 
-    def closeEvent(self, event):
+    def onOkay(self):
         genres = []
-        for checkbox in self.checkboxes:
-            if checkbox.isChecked():
-                genres.append(checkbox.text())
+        for i in range(self.listwidget.count()):
+            item = self.listwidget.item(i)
+            widget = self.listwidget.itemWidget(item)
+            if widget.isChecked():
+                genres.append(widget.text())
         self.genreSelected.emit(genres)
         self.close()
 
-
-
-
-
+    def onCancel(self):
+        self.close()
 
 class DateDialog(QDialog):
     chosen = Signal(str)
@@ -705,3 +713,6 @@ class FieldWidget(QWidget):
         self.line.setText(text)
         if isinstance(self.line, LineEdit):
             self.line.setCursorPosition(0)
+
+    def value(self):
+        return self._value
