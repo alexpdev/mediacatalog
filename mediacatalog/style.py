@@ -1,3 +1,7 @@
+import os
+from urllib.request import pathname2url
+from mediacatalog.utils import getfile, PARENT
+
 _style = """
 QWidget
 {
@@ -264,11 +268,13 @@ QDoubleSpinBox
 QSpinBox::up-button,
 QDoubleSpinBox::up-button
 {
+    image: url(%(up)s);
     border-width: 0px;
 }
 QSpinBox::down-button,
 QDoubleSpinBox::down-button
 {
+    image: url(%(down)s);
     border-width: 0px;
 }
 QSpinBox::up-button:hover,
@@ -323,6 +329,11 @@ QProgressBar::chunk
     border-bottom-left-radius: 0px;
     border-top-left-radius: 0px;
 }
+
+QListView[class="Seasons"] {
+    font-size: 12pt;
+}
+
 QListView,
 QListWidget,
 QTableView,
@@ -454,6 +465,7 @@ QComboBox
 QComboBox::drop-down
 {
     border: none;
+    image: url(%(down)s);
 }
 QComboBox:on
 {
@@ -594,9 +606,9 @@ QMainWindow::separator
 QSplitter::handle
 {
     border-radius: 0px;
-    width: 0px;
-    height: 0px;
-    margin: 1px;
+    width: 2px;
+    height: 5px;
+    margin: 0px;
 }
 QWidget[class="scrollBack"] {
     /* background-image: url('./assets/wooden-texture.png') 0 0 0 0 stretch stretch; */
@@ -640,7 +652,13 @@ QWidget[class="genreWidget"] {
     background-color: #EEE;
 }
 QLabel[class="field"] {
-    background-color: #00AAEE;
+    background-color: qlineargradient(spread:pad,
+        x1:0, y1:0,
+        x2:0, y2:1,
+        stop:0 rgba(70, 122, 201, 255),
+        stop:0.381 rgba(100, 146, 212, 255),
+        stop:1 rgba(150, 186, 230, 255)
+    );
     border-radius: 3px;
     font-size: 8pt;
     font-weight: bold;
@@ -665,7 +683,7 @@ QLabel[class="genre"] {
     padding-bottom: 5px;
     margin: 1px;
     font-size: 9pt;
-    border: outset solid #233;
+    border: 1px outset #233;
 }
 QCommandLinkButton {
     font-size: 7pt;
@@ -675,12 +693,13 @@ Qmenu[class="ratingMenu"] {
 }
 QToolButton { /* all types of tool button */
     border: 2px solid #8f8f91;
+    /*margin-right: 4px;*/
     border-radius: 6px;
     background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
                                       stop: 0 #f6f7fa, stop: 1 #dadbde);
 }
 
-QToolButton[popupMode="1"] { /* only for MenuButtonPopup */
+QToolButton[class="filter"] { /* only for MenuButtonPopup */
     padding-right: 20px; /* make way for the popup button */
 }
 
@@ -695,7 +714,6 @@ QToolButton::menu-button {
     border-top-right-radius: 6px;
     border-bottom-right-radius: 6px;
     /* 16px width + 4px for border = 20px allocated above */
-    width: 16px;
 }
 QToolButton:open { /* when the button has its menu open */
     background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
@@ -703,7 +721,7 @@ QToolButton:open { /* when the button has its menu open */
 }
 
 QToolButton::menu-indicator {
-    image: url(menu_indicator.png);
+    image: url(%(down)s);
     subcontrol-origin: padding;
     subcontrol-position: bottom right;
 }
@@ -714,6 +732,17 @@ QToolButton::menu-indicator:pressed, QToolButton::menu-indicator:open {
 }
 """
 
+def urlpath(path):
+    val = os.path.relpath(path, PARENT)
+    val = pathname2url(val)
+    return val
+
+
 
 def style():
-    return _style
+
+    vals = {
+        "up": urlpath(getfile("up")),
+        "down": urlpath(getfile("down"))
+    }
+    return _style % vals

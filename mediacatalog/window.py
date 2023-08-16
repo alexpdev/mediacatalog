@@ -24,7 +24,7 @@ class Window(QMainWindow):
         self.settings = SettingsWidget(self.db, self)
         self.settings.databaseReset.connect(self.onDbReset)
         self.movies = MediaPage("movies", self)
-        self.tv = TvPage("tv", self)
+        self.tv = TvPage(self)
         self.ufc = MediaPage("ufc", self)
         self.tabs.addTab(self.movies, "Movies")
         self.documentaries = MediaPage("documentaries", self)
@@ -33,6 +33,8 @@ class Window(QMainWindow):
         self.tabs.addTab(self.documentaries, "Documentaries")
         self.central.addWidget(self.tabs)
         self.central.addWidget(self.settings)
+        for tab in [self.movies, self.tv, self.ufc, self.documentaries]:
+            tab.toSettings.connect(self.onToSettings)
         self.menubar = self.menuBar()
         self.filemenu = QMenu("File")
         self.exitAction = QAction("Exit", self)
@@ -48,9 +50,11 @@ class Window(QMainWindow):
         self.settings.somethingChanged.connect(self.update_tables)
         self.resize(*self.db.setting("windowsize"))
 
-
     def onToHome(self):
         self.central.setCurrentWidget(self.tabs)
+
+    def onToSettings(self):
+        self.central.setCurrentWidget(self.settings)
 
     def onDbReset(self):
         del self.db
@@ -59,6 +63,7 @@ class Window(QMainWindow):
     def update_tables(self):
         for page in [self.movies, self.tv, self.ufc, self.documentaries]:
             page.table.tableModel().getData()
+            page.table.filter(None)
             page.table.selectRow(0)
 
     def setSetting(self, key, value):

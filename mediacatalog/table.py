@@ -1,12 +1,85 @@
 import json
+from typing import Any, Union
+import PySide6.QtCore
 
 from PySide6.QtWidgets import *
 from PySide6.QtCore import *
 from PySide6.QtGui import *
+import humanfriendly
 
 from mediacatalog.utils import geticon
 from mediacatalog.db import Diff
 from mediacatalog.settings import setting, setSetting, getData
+
+class ListView(QListView):
+
+    def __init__(self, parent=None):
+        super().__init__(parent=parent)
+        self.setProperty("class", "Seasons")
+        self._model = ListModel()
+        self.setModel(self._model)
+
+    def setSeasons(self, seasons):
+        self._model.setSeasons(seasons)
+
+    def row(self, index):
+        return self._model._seasons[index]
+
+
+
+class ListModel(QAbstractListModel):
+    def __init__(self, parent=None):
+        super().__init__(parent=parent)
+        self._seasons = []
+        self._header = ["Season"]
+
+    def rowCount(self, index=None):
+        return len(self._seasons)
+
+    def headerData(self, section, orientation, role):
+        if orientation == Qt.Orientation.Horizontal:
+            if role == Qt.ItemDataRole.DisplayRole:
+                return self._header[section]
+        return None
+
+    def data(self, index, role):
+        if index.isValid():
+            if role == Qt.ItemDataRole.DisplayRole:
+                return self._seasons[index.row()]
+        return None
+
+    def setSeasons(self, seasons):
+        self.clear()
+        self.insertRows(0, len(seasons), QModelIndex(), seasons)
+
+    def clear(self):
+        self.removeRows(0, self.rowCount(), QModelIndex())
+
+    def insertRow(self, start, index=None):
+        if index is None:
+            index = QModelIndex()
+        self.insertRows(start, 1, index)
+
+    def removeRow(self, start, index=None):
+        if index is None:
+            index = QModelIndex()
+        self.removeRows(start, 1, index)
+
+    def insertRows(self, start, count, index, data=[]):
+        self.beginInsertRows(QModelIndex(), start, start+count)
+        for i, season in enumerate(data):
+            self._seasons.insert(start+i, season)
+        self.endInsertRows()
+
+    def removeRows(self, start, count, index):
+        self.beginRemoveRows(QModelIndex(), start, start+count)
+        for i in list(range(start, start+count))[::-1]:
+            del self._seasons[i]
+        self.endRemoveRows()
+
+
+
+
 
 class TableModel(QAbstractTableModel):
     def __init__(self, table, mapping, fields=None, parent=None):
@@ -37,7 +110,7 @@ class TableModel(QAbstractTableModel):
                 continue
             if filters["quality"] and record["quality"] not in filters["quality"]:
                 continue
-            if filters["rating"] and record["rating"] not in filters["rating"]:
+            if filters["rating"] and record["userrating"] not in filters["rating"]:
                 continue
             found = False
             if filters["genre"]:
@@ -45,6 +118,8 @@ class TableModel(QAbstractTableModel):
                     if genre in filters["genre"]:
                         found = True
                         break
+            else:
+                found = True
             if not found:
                 continue
             if filters["watched"] and record["watched"] not in filters["watched"]:
@@ -82,9 +157,10 @@ class TableModel(QAbstractTableModel):
         return
 
     def set_data(self, data):
+        print(data)
         self.clearRows()
         for fullpath, record in data.items():
-            record["Path"] = fullpath
+            record["path"] = fullpath
             self.insertRow(self.rowCount(QModelIndex), record, QModelIndex())
 
     def removeRow(self, row, parent=QModelIndex()):
@@ -110,7 +186,6 @@ class TableModel(QAbstractTableModel):
             self.insertRow(self.rowCount(QModelIndex()), data, QModelIndex())
             self.apply_filters()
 
-
     def rowCount(self, _) -> int:
         return len(self._data)
 
@@ -120,21 +195,24 @@ class TableModel(QAbstractTableModel):
     def headerData(self, section, orientation, role):
         if orientation == Qt.Orientation.Horizontal:
             if role == Qt.ItemDataRole.DisplayRole:
-                return self._headers[section]
+                return self._mapping[self._headers_labels[section]]
+            elif role == Qt.ItemDataRole.SizeHintRole and self._mapping[self._headers_labels[section]] in ["pin", "watched"]:
+                return QSize(0, 10)
         return None
 
     def data(self, index, role):
         if index.isValid():
             row, col = index.row(), index.column()
-            label = self._headers[col]
-            field = self._reverse[label]
+            field = self._headers_labels[col]
             text = self._data[row][field]
             if field == "pin":
                 if text:
                     if role == Qt.ItemDataRole.DecorationRole:
                         return QIcon(geticon("pin"))
-                elif role == Qt.ItemDataRole.DisplayRole:
+                if role == Qt.ItemDataRole.DisplayRole:
                     return None
+                elif role == Qt.ItemDataRole.SizeHintRole:
+                    return QSize(0, 10)
             elif self._data[row]["path"] in Diff.missing_content:
                 if role == Qt.ItemDataRole.ForegroundRole:
                     return QBrush(QColor("#400"))
@@ -152,9 +230,26 @@ class TableModel(QAbstractTableModel):
                         return Qt.CheckState.Unchecked
                 elif role == Qt.ItemDataRole.DisplayRole:
                     return None
+                elif role == Qt.ItemDataRole.SizeHintRole:
+                    return QSize(0,10)
+                elif role == Qt.ItemDataRole.TextAlignmentRole:
+                    return Qt.AlignmentFlag.AlignCenter
+            elif field == "genre":
+                if role == Qt.ItemDataRole.DisplayRole:
+                    if isinstance(text, list):
+                        return "  ".join(text)
+            elif field == "foldersize":
+                if role == Qt.ItemDataRole.DisplayRole:
+                    return humanfriendly.format_size(text)
             if role == Qt.ItemDataRole.DisplayRole:
                 return text
+            if role == 100:
+                try:
+                    return float(text)
+                except:
+                    return text
         return None
+
 
     def removeColumn(self, column, parent=QModelIndex()):
         self.beginRemoveColumns(parent, column, column)
@@ -167,7 +262,6 @@ class TableModel(QAbstractTableModel):
         self.beginInsertColumns(parent, column, column)
         self._headers_labels.insert(column, self._reverse[value])
         self._headers.insert(column, value)
-        print(value)
         setSetting(self._fields + "columnfields", self._headers_labels)
         self.endInsertColumns()
 
@@ -179,6 +273,7 @@ class TableView(QTableView):
         self._fields = fields if fields is not None else table
         self._model = TableModel(self._table, mapping, fields=fields)
         self._proxy_model = QSortFilterProxyModel()
+        self._proxy_model.setSortRole(100)
         self.setModel(self._proxy_model)
         self._proxy_model.setSourceModel(self._model)
         self._proxy_model.setDynamicSortFilter(True)

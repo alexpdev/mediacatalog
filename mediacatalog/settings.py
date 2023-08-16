@@ -2,7 +2,8 @@ from pathlib import Path
 import json
 import os
 
-from mediacatalog.utils import MAPPING, EPISODE, SEASON, GENRES, QUALITY
+from mediacatalog import utils
+from mediacatalog.utils import MAPPING, EPISODE, GENRES, QUALITY, geticon
 
 from PySide6.QtWidgets import *
 from PySide6.QtCore import *
@@ -20,10 +21,9 @@ class Settings:
         "ufcprofilefields": list(MAPPING.keys()),
         "documentariescolumnfields": list(MAPPING.keys()),
         "moviescolumnfields": list(MAPPING.keys()),
-        "tvcolumnfields": list(MAPPING.keys()),
+        "tvcolumnfields": list(utils.TV_MAPPING.keys()),
         "ufccolumnfields": list(MAPPING.keys()),
         "episodecolumnfields": list(EPISODE.keys()),
-        "seasoncolumnfields": list(SEASON.keys()),
         "genres": GENRES,
         "quality": QUALITY,
         "windowsize": (1300, 700),
@@ -55,7 +55,7 @@ def getData(table):
 
 
 class GroupBox(QGroupBox):
-    somethingChanged = Signal(str, str)
+    somethingChanged = Signal()
 
     def __init__(self, title, parent=None):
         super().__init__(title, parent=parent)
@@ -90,6 +90,7 @@ class GroupBox(QGroupBox):
         paths = [item.text() for item in items if item and item.text()]
         key = self._title.lower()
         setSetting(key, paths)
+        self.somethingChanged.emit()
 
     def add_folder(self, path):
         self.list.addItem(path)
@@ -136,7 +137,6 @@ class TagBox(QGroupBox):
         text = QInputDialog.getText(self, f"Enter {self._field}", f"{self._field}")
         if text:
             path = text.replace("/", "\\")
-            print(path, text)
             self.list.addItem(path)
             self.onChange()
 
@@ -195,7 +195,7 @@ class SettingsWidget(QWidget):
         self.setDatabase(db)
         self.layout = QVBoxLayout(self)
         self.toolbar = QToolBar()
-        self.backAction = QAction("<-", self)
+        self.backAction = QAction(geticon("back"), "<-", self)
         self.toolbar.addAction(self.backAction)
         self.layout.addWidget(self.toolbar)
         self.backAction.triggered.connect(self.toHome.emit)
@@ -269,8 +269,10 @@ class SettingsWidget(QWidget):
             Settings.db.refresh_database()
         self.somethingChanged.emit()
 
-    def update_settings(self, key, value):
-        setSetting(key, value)
+    def update_settings(self, *args):
+        if len(args) == 2:
+            key, value = args
+            setSetting(key, value)
         Settings.db.refresh_database()
         self.somethingChanged.emit()
 

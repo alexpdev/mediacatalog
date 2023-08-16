@@ -1,4 +1,3 @@
-import json
 import subprocess
 from datetime import datetime
 import webbrowser
@@ -7,10 +6,9 @@ from PySide6.QtWidgets import *
 from PySide6.QtCore import *
 from PySide6.QtGui import *
 
-
 from mediacatalog import utils
-from mediacatalog.utils import MAPPING, SEASON, EPISODE
-from mediacatalog.table import TableView
+from mediacatalog.utils import MAPPING, EPISODE, geticon
+from mediacatalog.table import TableView, ListView
 from mediacatalog.settings import setting, setSetting, updateField
 
 
@@ -19,6 +17,15 @@ def reverse_mapping(field):
         if field == v:
             return k
 
+class DoubleClickLabel(QLabel):
+    doubleClicked = Signal()
+    def __init__(self):
+        super().__init__()
+
+    def mouseDoubleClickEvent(self, event: QMouseEvent) -> None:
+        self.doubleClicked.emit()
+        return super().mouseDoubleClickEvent(event)
+
 
 class MediaProfile(QWidget):
     fieldChanged = Signal(str, str)
@@ -26,19 +33,21 @@ class MediaProfile(QWidget):
     def __init__(self, table, parent=None):
         super().__init__(parent=parent)
         self._table = table
+        self._section = None
         self.images = None
         self.layout = QVBoxLayout(self)
-        self.label = QLabel()
+        self.label = DoubleClickLabel()
         self.label.setSizePolicy(
             QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Expanding
         )
         self.label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.label.setScaledContents(True)
-        self.button = QPushButton(self)
-        self.button.clicked.connect(self.switchImage)
+        self.label.doubleClicked.connect(self.switchImage)
+
+        # self.button = QPushButton(self)
+        # self.button.clicked.connect(self.switchImage)
         self.label.setFixedHeight(int(self.height() * 0.25))
         self.layout.addWidget(self.label)
-        self.layout.addWidget(self.button)
+        # self.layout.addWidget(self.button)
         self.scrollarea = QScrollArea()
         self.scrollarea.setHorizontalScrollBarPolicy(
             Qt.ScrollBarPolicy.ScrollBarAlwaysOff
@@ -62,6 +71,9 @@ class MediaProfile(QWidget):
             self.fields[key] = widget
             self.scrolllayout.addWidget(widget)
 
+
+    def section(self):
+        return self._section
 
     def onWatched(self):
         self.fieldChanged.emit("Watched", "watched")
@@ -92,13 +104,19 @@ class MediaProfile(QWidget):
             )
         )
 
-    def setCurrent(self, data):
+    def setCurrent(self, data, section=None):
+        self._section = section
         fields = setting(self._table + "profilefields")
-        self.images = data["images"]
+        self.images = None
+        if "image_cached" in data:
+            self.images = data["image_cached"]
+        elif "images" in data:
+            self.images = data["images"]
         if self.images:
             self._current = self.images[0]
             self._currentPixmap = QPixmap(self.images[0])
             self.label.setPixmap(self._currentPixmap)
+            self.label.setScaledContents(False)
         for key, value in data.items():
             if key in self.fields:
                 self.fields[key].setText(value)
@@ -115,14 +133,15 @@ class MediaProfile(QWidget):
         super().resizeEvent(event)
 
     def setCurrentSeason(self, data):
-        pass
+        self.setCurrent(data, section="season")
 
     def setCurrentEpisode(self, data):
-        pass
+        self.setCurrent(data, section="episode")
 
 
 class ToolBar(QToolBar):
     somethingChanged = Signal()
+    settingsPage = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent=parent)
@@ -137,26 +156,31 @@ class ToolBar(QToolBar):
         self.addWidget(self.title_line)
         self.addSeparator()
         self.quality = QToolButton()
+        self.quality.setProperty("class", "filter")
         self.quality.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
         self.quality.setText("Quality")
         self.addWidget(self.quality)
         self.addSeparator()
         self.genre = QToolButton()
+        self.genre.setProperty("class", "filter")
         self.genre.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
         self.genre.setText("Genre")
         self.addWidget(self.genre)
         self.addSeparator()
         self.status = QToolButton()
+        self.status.setProperty("class", "filter")
         self.status.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
         self.status.setText("Status")
         self.addWidget(self.status)
         self.addSeparator()
         self.watched = QToolButton()
+        self.watched.setProperty("class", "filter")
         self.watched.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
         self.watched.setText("Watched")
         self.addWidget(self.watched)
         self.addSeparator()
         self.rating = QToolButton()
+        self.rating.setProperty("class", "filter")
         self.rating.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
         self.rating.setText("Rating")
         self.addWidget(self.rating)
@@ -164,18 +188,23 @@ class ToolBar(QToolBar):
         folder_size = QLabel("Folder Size")
         self.addWidget(folder_size)
         self.folder_size_combo = QComboBox()
-        for i in ["", ">", "<", "="]:
+        self.folder_size_combo.setMaximumWidth(45)
+        for i in [">", "<", "="]:
             self.folder_size_combo.addItem(i)
         self.addWidget(self.folder_size_combo)
         self.folder_size_value = QSpinBox()
+        self.folder_size_value.setRange(0, 1000000000)
         self.addWidget(self.folder_size_value)
         self.addSeparator()
         right = QWidget()
         right.setFixedHeight(0)
         right.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.addWidget(right)
+        self.settingsAction = QAction(geticon("settings"), "Settings", self)
+        self.addAction(self.settingsAction)
         self.setupMenus()
         self.setupSignals()
+
 
     def onChange(self, *args):
         self.somethingChanged.emit()
@@ -230,7 +259,7 @@ class ToolBar(QToolBar):
         self.rating_menu = QMenu()
         self.rating_action_group = QActionGroup(self)
         self.rating_action_group.setExclusive(False)
-        for rating in ["0.5", "1.0", "1.5", "2.0", "2.5", "3.0", "3.5", "4.0", "4.5", "5.0"]:
+        for rating in ["0.0", "0.5", "1.0", "1.5", "2.0", "2.5", "3.0", "3.5", "4.0", "4.5", "5.0"]:
             action = QAction(rating, self)
             action.setCheckable(True)
             action.setChecked(False)
@@ -260,6 +289,7 @@ class ToolBar(QToolBar):
 
 class MediaPage(QWidget):
     toHome = Signal()
+    toSettings = Signal()
 
     def __init__(self, table, parent=None):
         super().__init__(parent=parent)
@@ -269,6 +299,7 @@ class MediaPage(QWidget):
         self.layout.addWidget(self.splitter2)
         self.toolbar = ToolBar(self)
         self.toolbar.somethingChanged.connect(self.filter_table)
+        self.toolbar.settingsAction.triggered.connect(self.go_to_settings)
         self.splitter2.addWidget(self.toolbar)
         self.widget = QWidget()
         self.splitter2.addWidget(self.widget)
@@ -325,41 +356,87 @@ class MediaPage(QWidget):
         row = self.table.tableModel().getRow(row)
         self.mediaProfile.setCurrent(row)
 
-class TvPage(MediaPage):
-    def __init__(self, table, parent=None):
-        super().__init__(table, parent=parent)
-        self.season_table = TableView(table, SEASON, fields="season")
-        self.season_table.setColumnMenu(utils.SeasonMenu)
-        self.episode_table = TableView(table, EPISODE, fields="episode")
+    def go_to_settings(self):
+        self.toSettings.emit()
+
+
+class TvPage(QWidget):
+    toHome = Signal()
+    toSettings = Signal()
+
+    def __init__(self, parent=None):
+        super().__init__(parent=parent)
+        self.layout = QVBoxLayout(self)
+        self.splitter2 = QSplitter(Qt.Orientation.Vertical)
+        self.layout.addWidget(self.splitter2)
+        self.toolbar = ToolBar(self)
+        self.toolbar.somethingChanged.connect(self.filter_table)
+        self.toolbar.settingsAction.triggered.connect(self.go_to_settings)
+        self.splitter2.addWidget(self.toolbar)
+        self.widget = QWidget()
+        self.splitter2.addWidget(self.widget)
+        layout1 = QVBoxLayout(self.widget)
+        self.splitter = QSplitter()
+        layout1.addWidget(self.splitter)
+        self.table = TableView("tv", utils.TV_MAPPING)
+        self.table.setColumnMenu(utils.TvColumnMenu)
+        self.splitter.addWidget(self.table)
+        self.table.selectionModel().currentRowChanged.connect(self.onRowChanged)
+        slider_size = setting(f"tvmediaslider")
+        if slider_size:
+            self.splitter.setSizes(slider_size)
+        slider_size = setting(f"tvtoolbarslider")
+        if slider_size:
+            self.splitter2.setSizes(slider_size)
+        self.splitter.splitterMoved.connect(self.updateSplitterSizes)
+        self.splitter2.splitterMoved.connect(self.updateSplitterSizes)
+        self.seasons = ListView()
+        self.episode_table = TableView("tv", EPISODE, fields="episode")
         self.episode_table.setColumnMenu(utils.EpisodeMenu)
-        self.splitter.addWidget(self.season_table)
+        self.splitter.addWidget(self.seasons)
         self.splitter.addWidget(self.episode_table)
-        self.season_table.selectionModel().currentRowChanged.connect(
-            self.onSeasonSelected
-        )
+        self.seasons.selectionModel().currentChanged.connect(self.onSeasonSelected)
         self.episode_table.selectionModel().currentRowChanged.connect(
             self.onEpisodeSelected
         )
         self.addMediaProfile()
 
-    def add_extras(self):
-        pass
+    def filter_table(self):
+        filters = self.toolbar.gather_values()
+        self.table.filter(filters)
 
     def onSeasonSelected(self, current, previous):
-        row = self.season_table.tableModel().getRow(current)
-        self.mediaProfile.setCurrentSeason(row)
-        self.episode_table.tableModel().set_data(row["episodes"])
+        row = self.table.selectionModel().selectedRows()[0]
+        row = self.table.model().mapToSource(row)
+        data = self.table.tableModel().getRow(row)
+        season = data["seasons"][self.seasons.row(current.row())]
+        season = {i["path"]: i for i in season}
+        self.episode_table.tableModel().set_data(season)
 
     def onRowChanged(self, current, previous):
         row = self.table.tableModel().getRow(current)
+        self.seasons.setSeasons(row["seasons"].keys())
         self.mediaProfile.setCurrent(row)
-        self.season_table.tableModel().set_data(row["seasons"])
 
     def onEpisodeSelected(self, current, previous):
         row = self.episode_table.tableModel().getRow(current)
         self.mediaProfile.setCurrentEpisode(row)
 
+    def addMediaProfile(self):
+        self.mediaProfile = MediaProfile("tv", self)
+        self.mediaProfile.fieldChanged.connect(self.onFieldChanged)
+        self.splitter.addWidget(self.mediaProfile)
+        self.table.selectRow(0)
 
+    def updateSplitterSizes(self, *args):
+        setSetting(f"tvmediaslider", self.splitter.sizes())
+        setSetting(f"tvtoolbarslider", self.splitter2.sizes())
+
+    def go_to_settings(self):
+        self.toSettings.emit()
+
+    def onFieldChanged(self, field, value):
+        print(field, value)
 
 
 class Watched(QWidget):
@@ -413,7 +490,8 @@ class RatingWidget(QWidget):
         self._labels = []
 
     def clearWidget(self):
-        for item in range(self._layout.count()):
+        for i in range(self._layout.count()):
+            item = self._layout.takeAt(i)
             if item and item.widget():
                 item.widget().deleteLater()
         if self._widget_layout is not None:
@@ -497,6 +575,8 @@ class GenreWidget(QWidget):
         self._widget_layout = QHBoxLayout(self._widget)
         self._widget_layout.setContentsMargins(0, 0, 0, 0)
         self._widget_layout.setSpacing(0)
+        if isinstance(text, str):
+            text = [text]
         for item in text:
             label = QLabel(item)
             label.setSizePolicy(QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Maximum)
@@ -535,7 +615,12 @@ class FieldLabel(QLabel):
             if msgbox and msgbox[0]:
                 self.fieldChanged.emit(msgbox[0])
         elif self._text.lower() in ["premiered",  "last\nviewed", "date\nadded"]:
-            msgbox = DateDialog(self._text, self._parent.line.text())
+            if self._parent.line.text():
+                vals = list(map(int, self._parent.line.text().split("-")))
+                date = QDate(vals[-1],vals[0], vals[1])
+                msgbox = DateDialog(self._text, date,)
+            else:
+                msgbox = DateDialog(self._text, QDate().currentDate())
             msgbox.chosen.connect(self.setFieldChange)
             msgbox.exec()
         elif self._text.lower() in ["runtime", "play\ncount"]:
@@ -544,7 +629,7 @@ class FieldLabel(QLabel):
                 value = "0"
             msgbox = QInputDialog.getInt(self, "Edit " + self._text, self._text, int(value))
             if msgbox and msgbox[0]:
-                self.fieldChanged.emit(msgbox[0])
+                self.fieldChanged.emit(str(msgbox[0]))
         elif self._text.lower() in ["quality"]:
             lst = utils.QUALITY
             msgbox = QInputDialog.getItem(self, "Edit " + self._text, self._text, lst, 0, False)
@@ -554,41 +639,43 @@ class FieldLabel(QLabel):
             self.open_genre_dialog(self._parent.value())
         elif self._text.lower() == "rating":
             menu = QMenu()
+            action_00 = QAction("0.0", self)
+            menu.addAction(action_00)
+            action_00.triggered.connect(lambda: self.fieldChanged.emit(str(0.0)))
             action_05 = QAction("0.5", self)
             menu.addAction(action_05)
-            action_05.triggered.connect(lambda: self.fieldChanged.emit(str(.5)))
+            action_05.triggered.connect(lambda: self.fieldChanged.emit(str(0.5)))
             action_1 = QAction("1.0", self)
             menu.addAction(action_1)
-            action_1.triggered.connect(lambda: self.fieldChanged.emit(str(1)))
+            action_1.triggered.connect(lambda: self.fieldChanged.emit(str(1.0)))
             action_105 = QAction("1.5", self)
             menu.addAction(action_105)
             action_105.triggered.connect(lambda: self.fieldChanged.emit(str(1.5)))
             action_2 = QAction("2.0", self)
             menu.addAction(action_2)
-            action_2.triggered.connect(lambda: self.fieldChanged.emit(str(2)))
+            action_2.triggered.connect(lambda: self.fieldChanged.emit(str(2.0)))
             action_205 = QAction("2.5", self)
             menu.addAction(action_205)
             action_205.triggered.connect(lambda: self.fieldChanged.emit(str(2.5)))
             action_3 = QAction("3.0", self)
             menu.addAction(action_3)
-            action_3.triggered.connect(lambda: self.fieldChanged.emit(str(3)))
+            action_3.triggered.connect(lambda: self.fieldChanged.emit(str(3.0)))
             action_305 = QAction("3.5", self)
             menu.addAction(action_305)
             action_305.triggered.connect(lambda: self.fieldChanged.emit(str(3.5)))
             action_4 = QAction("4.0", self)
             menu.addAction(action_4)
-            action_4.triggered.connect(lambda: self.fieldChanged.emit(str(4)))
+            action_4.triggered.connect(lambda: self.fieldChanged.emit(str(4.0)))
             action_405 = QAction("4.5", self)
             menu.addAction(action_405)
             action_405.triggered.connect(lambda: self.fieldChanged.emit(str(4.5)))
             action_5 = QAction("5.0", self)
             menu.addAction(action_5)
-            action_5.triggered.connect(lambda: self.fieldChanged.emit(str(5)))
+            action_5.triggered.connect(lambda: self.fieldChanged.emit(str(5.0)))
             menu.exec(QCursor.pos())
         return super().mouseDoubleClickEvent(event)
 
     def setFieldChange(self, value):
-        print(value, type(value))
         self.fieldChanged.emit(value)
 
     def open_genre_dialog(self, value):
@@ -598,6 +685,7 @@ class FieldLabel(QLabel):
 
     def onGenreSelected(self, lst):
         self._parent.setText(lst)
+
 
 class GenreDialog(QDialog):
     genreSelected = Signal(list)
@@ -623,7 +711,7 @@ class GenreDialog(QDialog):
             self.listwidget.setItemWidget(item, checkbox)
             if self._value:
                 if genre in self._value:
-                    checkbox.setChecked()
+                    checkbox.setChecked(True)
 
     def onOkay(self):
         genres = []
@@ -645,7 +733,7 @@ class DateDialog(QDialog):
         super().__init__(parent=parent)
         self.setWindowTitle("Edit " +  field)
         self.vboxlayout = QVBoxLayout(self)
-        self.dateedit = QDateEdit()
+        self.dateedit = QDateEdit(current)
         self.label = QLabel(field)
         self.formlayout = QFormLayout()
         self.formlayout.addRow(field, self.dateedit)
@@ -714,6 +802,8 @@ class FieldWidget(QWidget):
 
     def setText(self, text):
         self._value = text
+        if isinstance(text, int):
+            text = str(text)
         self.line.setText(text)
         if isinstance(self.line, LineEdit):
             self.line.setCursorPosition(0)

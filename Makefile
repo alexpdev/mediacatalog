@@ -12,7 +12,7 @@ run: ## run file
 	python run.py
 
 compile: clean ## compile app
-	pyinstaller -F -w --icon ./assets/popcorn.ico --add-data "./assets;./assets"  --name Fuzzys_Media_Manager run.py
+	## pyinstaller -F -w --icon ./assets/popcorn.ico --add-data "./assets;./assets"  --name Fuzzys_Media_Manager run.py
 	pyinstaller -w --icon ./assets/popcorn.ico --add-data "./assets;./assets"  --name Fuzzys_Media_Manager run.py
 
 push: clean ## push to github
@@ -24,4 +24,4 @@ setup: compile ## run setup installer bundler
 	iscc ./output/mediacatalog_setup.iss
 
 bundle: setup
-	7z a Fuzzys_Media_Manager_v0.1.zip mediacatalog assets run.py dist README.md CHANGELOG.md Output "Movies and TV Shows_V18S3 Demo.xlsm" .gitignore
+	7z a Fuzzys_Media_Manager_v0.3.zip mediacatalog assets run.py dist README.md CHANGELOG.md "Movies and TV Shows_V18S3 Demo.xlsm" .gitignore

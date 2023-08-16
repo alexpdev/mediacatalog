@@ -10,7 +10,7 @@ from PySide6.QtWidgets import *
 from PySide6.QtCore import *
 from PySide6.QtGui import *
 
-from mediacatalog.utils import nfo_to_dict, MAPPING
+from mediacatalog.utils import nfo_to_dict, MAPPING, tv_nfo_to_dict
 from mediacatalog.settings import Settings, setting
 
 
@@ -47,7 +47,6 @@ def find_image_files(path):
             paths += find_image_files(fullpath)
     return paths
 
-
 def find_nfo(path):
     if not os.path.isdir(path):
         return None
@@ -55,29 +54,6 @@ def find_nfo(path):
         if os.path.splitext(item)[-1].lower() == ".nfo":
             return os.path.join(path, item)
     return None
-
-
-def scan_seasons(path):
-    seasons = {}
-    for name in os.listdir(os.path.realpath(path)):
-        fullpath = os.path.join(path, name)
-        if name.lower().startswith("season") and os.path.isdir(fullpath):
-            seasons[fullpath] = {
-                "name": name,
-                "playcount": 0,
-                "rating": 0,
-                "episodes": {},
-            }
-            for episode in os.listdir(fullpath):
-                episode_path = os.path.join(fullpath, episode)
-                seasons[fullpath]["episodes"][episode_path] = {
-                    "filename": episode,
-                    "playcount": 0,
-                    "rating": 0,
-                    "title": os.path.splitext(episode)[0].split("- ")[-1],
-                }
-    return seasons
-
 
 def scan_videos(path):
     video_files = []
@@ -95,14 +71,14 @@ def scan_videos(path):
     return video_files
 
 
-def scan_media(path, category, paths, deep=False):
+def scan_media(path, paths):
     records = []
     if not path:
         return records
     for item in os.listdir(path):
         record = {}
         fullpath = os.path.join(path, item)
-        if fullpath in paths and not deep:
+        if fullpath in paths:
             continue
         record["foldername"] = item
         record["path"] = fullpath
@@ -112,26 +88,82 @@ def scan_media(path, category, paths, deep=False):
         if nfo is not None:
             with open(nfo, "rt", encoding="utf8") as nfofile:
                 content = nfofile.read()
-            record.update(nfo_to_dict(content))
-            record["nfopath"] = nfo
         else:
-            temp = {key: None for key in MAPPING.keys() if key not in record}
-            record.update(temp)
-        if category == "tv":
-            record["seasons"] = scan_seasons(fullpath)
-        else:
-            if category == "movies":
-                parts = item.split()
-                try:
-                    record["foldertitle"] = parts[0]
-                    record["folderyear"] = parts[1].strip("()")
-                    record["folderimdb"] = parts[2].strip("()")
-                except IndexError:
-                    pass
-            record["videofiles"] = scan_videos(fullpath)
+            content = None
+        record.update(nfo_to_dict(content))
+        record["nfopath"] = nfo
+        parts = item.split()
+        try:
+            record["foldertitle"] = parts[0]
+            record["folderyear"] = parts[1].strip("()")
+            record["folderimdb"] = parts[2].strip("()")
+        except IndexError:
+            pass
+        record["videofiles"] = scan_videos(fullpath)
         records.append(record)
     return records
 
+def scan_tv_media(paths, path, new):
+    if not path:
+        return []
+    records = []
+    for folder in os.listdir(path):
+        folderpath = os.path.join(path, folder)
+        if folderpath not in paths:
+            record = {}
+            record["foldername"] = folder
+            record["path"] = folderpath
+            record["foldersize"] = get_folder_size(folderpath)
+            record["images"] = find_image_files(folderpath)
+            parts = folder.split()
+            nfo = find_nfo(folderpath)
+            try:
+                record["foldertitle"] = parts[0]
+                record["folderyear"] = parts[1].strip("()")
+                record["folderimdb"] = parts[2].strip("()")
+            except IndexError:
+                pass
+            if nfo is not None:
+                with open(nfo, "rt", encoding="utf8") as nfofile:
+                    content = nfofile.read()
+            else:
+                content = None
+            record.update(tv_nfo_to_dict(content))
+            record["nfopath"] = nfo
+            record["seasons"] = {}
+        else:
+            record = paths[folderpath]
+        scan_seasons(record, folderpath, new)
+        records.append(record)
+    return records
+
+def scan_seasons(record, path, new):
+    for item in os.listdir(path):
+        fullpath = os.path.join(path, item)
+        if os.path.isdir(fullpath) and item.lower().startswith("season"):
+            record["seasons"].setdefault(item, [])
+            episode_paths = [i["path"] for i in record["seasons"][item]]
+            for epi in os.listdir(fullpath):
+                epi_path = os.path.join(fullpath, epi)
+                if epi_path in episode_paths:
+                    continue
+                parts = os.path.splitext(epi)[0].split("-")
+                numbers = parts[1].strip()
+                season, episode_num = numbers.lower().split("x")
+                episode = {
+                    "path": epi_path,
+                    "season": int(season),
+                    "title": parts[2].strip(),
+                    "number": int(episode_num),
+                    "userrating": 0.0,
+                    "watched": "unwatched",
+                    "playcount": 0,
+                    "lastviewed": "",
+                    "dateadded": datetime.datetime.today().strftime("%m-%d-%Y"),
+                    "pin": False,
+                }
+                record["seasons"][item].append(episode)
+                new.append(episode)
 
 class SqlDatabase:
 
@@ -170,7 +202,7 @@ class SqlDatabase:
 
     def refresh_database(self, deep=False):
         cursor = self.conn.cursor()
-        for key in ["movies", "tv", "ufc", "documentaries"]:
+        for key in ["movies", "ufc", "documentaries"]:
             values = self.setting(key)
             records = []
             cursor.execute(f"SELECT * FROM {key}")
@@ -183,11 +215,10 @@ class SqlDatabase:
                 else:
                     paths.append(path)
             for val in values:
-                records += scan_media(val, key, paths, deep=deep)
+                records += scan_media(val, paths)
             for record in records:
                 path = record["path"]
-                if not deep:
-                    Diff.new_content[path] = record
+                Diff.new_content[path] = record
                 foldername = record["foldername"]
                 record["image_cached"] = []
                 for img in record["images"]:
@@ -198,17 +229,36 @@ class SqlDatabase:
                     shutil.copy(img, loc)
                     record["image_cached"].append(loc)
                 jsondata = json.dumps(record)
-                if path in paths:
-                    diff, record = self.compare_records(
-                        record, json.loads(current[paths.index(path)][-1])
+                cursor.execute(
+                    f"INSERT INTO {key} values(?, ?, ?)",
+                    (path, foldername, jsondata),
+                )
+        self.conn.commit()
+        self.refresh_tv()
+
+    def refresh_tv(self):
+        cursor = self.conn.cursor()
+        values = self.setting("tv")
+        cursor.execute(f"SELECT * FROM tv")
+        current = cursor.fetchall()
+        paths = {item[0]: json.loads(item[-1]) for item in current}
+        for val in values:
+            new = []
+            records = scan_tv_media(paths, val, new)
+            for record in records:
+                jsondata = json.dumps(record)
+                if record["path"] in paths:
+                    cursor.execute(
+                        f'UPDATE tv SET "json" = ? WHERE "foldername" = ?',
+                        (jsondata, record["foldername"]),
                     )
-                    Diff.content[path] = diff
-                    self.updateField(key, foldername, "json", json.dumps(record))
                 else:
                     cursor.execute(
-                        f"INSERT INTO {key} values(?, ?, ?)",
-                        (path, foldername, jsondata),
+                        f"INSERT INTO tv values(?, ?, ?)",
+                        (record["path"], record["foldername"], jsondata),
                     )
+            for episode in new:
+                Diff.new_content[episode["path"]] = episode
         self.conn.commit()
 
     def setup_database(self, path):
@@ -244,28 +294,3 @@ class SqlDatabase:
         cursor = self.conn.cursor()
         cursor.execute(f"SELECT * FROM {table}")
         return cursor.fetchall()
-
-    def compare_records(self, new_record, old_record):
-        diff = {}
-        for k, v in new_record.items():
-            if k in ["userrating", "playcount", "dateadded", "lastviewed", "comments"]:
-                continue
-            if old_record[k] != v:
-                if k != "seasons":
-                    diff[k] = v
-                    old_record[k] = v
-                    continue
-                for season in v:
-                    if season not in old_record["seasons"]:
-                        diff.setdefault("seasons", {})
-                        diff["seasons"][season] = v
-                        old_record["seasons"][season] = new_record["seasons"][season]
-                    elif old_record["seasons"][season] != v:
-                        diff["seasons"][season] = {"episodes": []}
-                        for episode in season["episodes"]:
-                            if episode not in old_record["seasons"][season]["episodes"]:
-                                diff["season"][season]["episodes"].append(episode)
-                                old_record["season"][season]["episodes"] = new_record[
-                                    "season"
-                                ][season]["episodes"]
-        return diff, old_record
