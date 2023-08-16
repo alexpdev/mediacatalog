@@ -11,7 +11,7 @@ from mediacatalog.utils import geticon
 from mediacatalog.db import Diff
 from mediacatalog.settings import setting, setSetting, getData
 
-class ListView(QListView):
+class ListView(QTreeView):
 
     def __init__(self, parent=None):
         super().__init__(parent=parent)
@@ -25,13 +25,17 @@ class ListView(QListView):
     def row(self, index):
         return self._model._seasons[index]
 
+    def current(self):
+        row = self.selectionModel().currentIndex().row()
+        return self.row(row)
+
 
 
 class ListModel(QAbstractListModel):
     def __init__(self, parent=None):
         super().__init__(parent=parent)
         self._seasons = []
-        self._header = ["Season"]
+        self._header = ["Seasons"]
 
     def rowCount(self, index=None):
         return len(self._seasons)
@@ -157,7 +161,6 @@ class TableModel(QAbstractTableModel):
         return
 
     def set_data(self, data):
-        print(data)
         self.clearRows()
         for fullpath, record in data.items():
             record["path"] = fullpath
@@ -210,7 +213,7 @@ class TableModel(QAbstractTableModel):
                     if role == Qt.ItemDataRole.DecorationRole:
                         return QIcon(geticon("pin"))
                 if role == Qt.ItemDataRole.DisplayRole:
-                    return None
+                    return text
                 elif role == Qt.ItemDataRole.SizeHintRole:
                     return QSize(0, 10)
             elif self._data[row]["path"] in Diff.missing_content:
@@ -223,17 +226,10 @@ class TableModel(QAbstractTableModel):
                     elif role == Qt.ItemDataRole.BackgroundRole:
                         return QBrush(QColor("#CCC"))
             elif field == "watched":
-                if role == Qt.ItemDataRole.CheckStateRole:
-                    if text:
-                        return Qt.CheckState.Checked
-                    else:
-                        return Qt.CheckState.Unchecked
-                elif role == Qt.ItemDataRole.DisplayRole:
-                    return None
-                elif role == Qt.ItemDataRole.SizeHintRole:
-                    return QSize(0,10)
-                elif role == Qt.ItemDataRole.TextAlignmentRole:
-                    return Qt.AlignmentFlag.AlignCenter
+                if role == Qt.ItemDataRole.DecorationRole:
+                    if text and text.lower() != "unwatched":
+                        return
+
             elif field == "genre":
                 if role == Qt.ItemDataRole.DisplayRole:
                     if isinstance(text, list):
@@ -277,6 +273,13 @@ class TableView(QTableView):
         self.setModel(self._proxy_model)
         self._proxy_model.setSourceModel(self._model)
         self._proxy_model.setDynamicSortFilter(True)
+        headers = self._model.headers()
+        if "Pin" in headers:
+            self._pin_delegate = PinDelegate(self)
+            self.setItemDelegateForColumn(headers.index("Pin"), self._pin_delegate)
+        if "Watched" in headers:
+            self._watched_delegate = WatchedDelegate(self)
+            self.setItemDelegateForColumn(headers.index("Watched"), self._watched_delegate)
         self.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.horizontalHeader().setContextMenuPolicy(
@@ -361,3 +364,27 @@ class CheckBoxDelegate(QStyledItemDelegate):
                              option.rect.height() / 2 -
                              check_box_rect.height() / 2)
         return QRect(check_box_point, check_box_rect.size())
+
+
+class PinDelegate(QStyledItemDelegate):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+
+
+    def paint(self, painter, option, index):
+        value = self.parent().model().data(index, Qt.ItemDataRole.DisplayRole)
+        print(value)
+        if value:
+            icon = geticon("pin")
+            icon.paint(painter, option.rect, Qt.AlignCenter)
+
+class WatchedDelegate(QStyledItemDelegate):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+
+
+    def paint(self, painter, option, index):
+        value = self.parent().model().data(index, Qt.ItemDataRole.DisplayRole)
+        if value != "unwatched":
+            icon = geticon("check")
+            icon.paint(painter, option.rect, Qt.AlignCenter)

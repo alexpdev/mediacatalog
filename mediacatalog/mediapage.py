@@ -12,10 +12,11 @@ from mediacatalog.table import TableView, ListView
 from mediacatalog.settings import setting, setSetting, updateField
 
 
-def reverse_mapping(field):
-    for k, v in MAPPING.items():
+def reverse_mapping(field, mapping=MAPPING):
+    for k, v in mapping.items():
         if field == v:
             return k
+    return None
 
 class DoubleClickLabel(QLabel):
     doubleClicked = Signal()
@@ -33,7 +34,6 @@ class MediaProfile(QWidget):
     def __init__(self, table, parent=None):
         super().__init__(parent=parent)
         self._table = table
-        self._section = None
         self.images = None
         self.layout = QVBoxLayout(self)
         self.label = DoubleClickLabel()
@@ -42,12 +42,8 @@ class MediaProfile(QWidget):
         )
         self.label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.label.doubleClicked.connect(self.switchImage)
-
-        # self.button = QPushButton(self)
-        # self.button.clicked.connect(self.switchImage)
         self.label.setFixedHeight(int(self.height() * 0.25))
         self.layout.addWidget(self.label)
-        # self.layout.addWidget(self.button)
         self.scrollarea = QScrollArea()
         self.scrollarea.setHorizontalScrollBarPolicy(
             Qt.ScrollBarPolicy.ScrollBarAlwaysOff
@@ -58,9 +54,11 @@ class MediaProfile(QWidget):
         self.scrollarea.setWidget(self.scrollWidget)
         self.scrollarea.setWidgetResizable(True)
         self.scrolllayout = QVBoxLayout(self.scrollWidget)
-        self.button = QPushButton()
         self.layout.addWidget(self.scrollarea)
         self.fields = {}
+        self.add_fields()
+
+    def add_fields(self):
         for key, value in MAPPING.items():
             if key in ["plot", "comments"]:
                 widget = FieldWidget(value, "text", self)
@@ -70,7 +68,6 @@ class MediaProfile(QWidget):
             widget.watchedEnabled.connect(self.onWatched)
             self.fields[key] = widget
             self.scrolllayout.addWidget(widget)
-
 
     def section(self):
         return self._section
@@ -105,8 +102,6 @@ class MediaProfile(QWidget):
         )
 
     def setCurrent(self, data, section=None):
-        self._section = section
-        fields = setting(self._table + "profilefields")
         self.images = None
         if "image_cached" in data:
             self.images = data["image_cached"]
@@ -120,10 +115,6 @@ class MediaProfile(QWidget):
         for key, value in data.items():
             if key in self.fields:
                 self.fields[key].setText(value)
-                if key not in fields:
-                    self.fields[key].hide()
-                else:
-                    self.fields[key].show()
 
     def resizeEvent(self, event):
         self.label.setFixedHeight(int(self.height() * 0.25))
@@ -132,11 +123,44 @@ class MediaProfile(QWidget):
         self.scrollWidget.setFixedWidth(self.scrollarea.viewport().width())
         super().resizeEvent(event)
 
-    def setCurrentSeason(self, data):
-        self.setCurrent(data, section="season")
 
-    def setCurrentEpisode(self, data):
-        self.setCurrent(data, section="episode")
+class TvMediaProfile(MediaProfile):
+    fieldChanged = Signal(str, str)
+
+    def __init__(self, table="tv", parent=None):
+        super().__init__(table, parent=parent)
+
+    def add_fields(self):
+        for key, value in utils.TV_MAPPING.items():
+            if key in ["plot", "comments"]:
+                widget = FieldWidget(value, "text", self)
+            else:
+                widget = FieldWidget(value, "line", self)
+            widget.fieldChanged.connect(self.onFieldChanged)
+            self.fields[key] = widget
+            self.scrolllayout.addWidget(widget)
+        for key, value in utils.EPISODE.items():
+            widget = FieldWidget(value, "line", self)
+            widget.fieldChanged.connect(self.onFieldChanged)
+            widget.watchedEnabled.connect(self.onWatched)
+            self.fields[key] = widget
+            self.scrolllayout.addWidget(widget)
+
+    def setCurrent(self, data, section=None):
+        images = None
+        if "image_cached" in data:
+            images = data["image_cached"]
+        elif "images" in data:
+            images = data["images"]
+        if images:
+            self.images = images
+            self._current = self.images[0]
+            self._currentPixmap = QPixmap(self.images[0])
+            self.label.setPixmap(self._currentPixmap)
+            self.label.setScaledContents(False)
+        for key, value in data.items():
+            if key in self.fields:
+                self.fields[key].setText(value)
 
 
 class ToolBar(QToolBar):
@@ -334,11 +358,7 @@ class MediaPage(QWidget):
         self.table.selectRow(0)
 
     def onFieldChanged(self, field, value):
-        current = self.table.selectionModel().selectedRows()
-        if not current:
-            return
-        else:
-            current = current[0]
+        current = self.table.selectionModel().selectedRows()[0]
         row = self.table.model().mapToSource(current)
         data = self.table.tableModel().getRow(row)
         foldername = data["foldername"]
@@ -405,6 +425,12 @@ class TvPage(QWidget):
         filters = self.toolbar.gather_values()
         self.table.filter(filters)
 
+    def addMediaProfile(self):
+        self.mediaProfile = TvMediaProfile("tv", self)
+        self.mediaProfile.fieldChanged.connect(self.onFieldChanged)
+        self.splitter.addWidget(self.mediaProfile)
+        self.table.selectRow(0)
+
     def onSeasonSelected(self, current, previous):
         row = self.table.selectionModel().selectedRows()[0]
         row = self.table.model().mapToSource(row)
@@ -420,13 +446,7 @@ class TvPage(QWidget):
 
     def onEpisodeSelected(self, current, previous):
         row = self.episode_table.tableModel().getRow(current)
-        self.mediaProfile.setCurrentEpisode(row)
-
-    def addMediaProfile(self):
-        self.mediaProfile = MediaProfile("tv", self)
-        self.mediaProfile.fieldChanged.connect(self.onFieldChanged)
-        self.splitter.addWidget(self.mediaProfile)
-        self.table.selectRow(0)
+        self.mediaProfile.setCurrent(row)
 
     def updateSplitterSizes(self, *args):
         setSetting(f"tvmediaslider", self.splitter.sizes())
@@ -436,7 +456,30 @@ class TvPage(QWidget):
         self.toSettings.emit()
 
     def onFieldChanged(self, field, value):
-        print(field, value)
+        current = self.table.selectionModel().currentIndex()
+        row = self.table.model().mapToSource(current)
+        data = self.table.tableModel().getRow(row)
+        foldername = data["foldername"]
+        key = reverse_mapping(field, mapping=utils.TV_MAPPING)
+        if not key:
+            key = reverse_mapping(field, mapping=EPISODE)
+            season_text = self.seasons.current()
+            season_data = data["seasons"][season_text]
+            episode = self.episode_table.selectionModel().currentIndex()
+            episode_row = self.episode_table.model().mapToSource(episode)
+            episode_data = self.episode_table.tableModel().getRow(episode_row)
+            for record in season_data:
+                if record["path"] == episode_data["path"]:
+                    record[key] = value
+                    episode_data[key] = value
+                    break
+            updateField("tv", foldername, "seasons", data["seasons"])
+            self.table.tableModel().dataChanged.emit(row, row)
+            self.episode_table.tableModel().dataChanged.emit(episode, episode)
+        else:
+            updateField("tv", foldername, key, value)
+            data[key] = value
+            self.table.tableModel().dataChanged.emit(row, row)
 
 
 class Watched(QWidget):
@@ -602,9 +645,9 @@ class FieldLabel(QLabel):
                 self.fieldChanged.emit("true")
             else:
                 self.fieldChange.emit("false")
-        elif self._text.lower() in [ "season", "episode", "nfo", "path", "folder name", "folder size"]:
+        elif self._text.lower() in ["nfo", "path", "folder name", "folder size", "episode\nnumber"]:
             pass
-        elif self._text.lower() in ["imdb", "title", "plot", "tag line","country", "director", "year", "trailer", "studio", "status", "content\nrating", "comments"]:
+        elif self._text.lower() in ["imdb", "title", "plot", "tag line","country", "director", "year", "trailer", "studio", "status", "content\nrating", "comments", "episode\ntitle"]:
             msgbox = QInputDialog.getText(
                 self,
                 "Edit " + self._text,
@@ -637,7 +680,7 @@ class FieldLabel(QLabel):
                 self.fieldChanged.emit(msgbox[0])
         elif self._text.lower() == "genre":
             self.open_genre_dialog(self._parent.value())
-        elif self._text.lower() == "rating":
+        elif self._text.lower() in ["rating", "episode\nrating"]:
             menu = QMenu()
             action_00 = QAction("0.0", self)
             menu.addAction(action_00)
@@ -768,7 +811,7 @@ class FieldWidget(QWidget):
         self.layout = QFormLayout(self)
         self.layout.setSpacing(0)
         self.layout.setContentsMargins(0, 0, 0, 0)
-        if self._field == "Rating":
+        if self._field in ["Rating", "Episode Rating"]:
             self.line = RatingWidget(self)
         elif self._field == "Watched":
             self.line = Watched(self)

@@ -330,7 +330,8 @@ QProgressBar::chunk
     border-top-left-radius: 0px;
 }
 
-QListView[class="Seasons"] {
+QTreeView[class="Seasons"],
+QTreeView QHeaderView {
     font-size: 12pt;
 }
 

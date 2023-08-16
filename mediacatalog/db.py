@@ -153,9 +153,9 @@ def scan_seasons(record, path, new):
                 episode = {
                     "path": epi_path,
                     "season": int(season),
-                    "title": parts[2].strip(),
-                    "number": int(episode_num),
-                    "userrating": 0.0,
+                    "episodetitle": parts[2].strip(),
+                    "episodenumber": int(episode_num),
+                    "episoderating": "0.0",
                     "watched": "unwatched",
                     "playcount": 0,
                     "lastviewed": "",
@@ -174,6 +174,7 @@ class SqlDatabase:
         self.setup_database(path)
         self.conn = sqlite3.connect(path)
         self.refresh_database()
+
 
     def settings(self):
         cursor = self.conn.cursor()

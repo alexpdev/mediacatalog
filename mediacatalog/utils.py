@@ -33,9 +33,9 @@ def geticon(text):
     return QIcon(getimage(text))
 
 EPISODE = {
-    "title": "Title",
-    "number": "Number",
-    "userrating": "Rating",
+    "episodetitle": "Episode Title",
+    "episodenumber": "Episode Number",
+    "episoderating": "Episode Rating",
     "watched": "Watched",
     "playcount": "Play Count",
     "lastviewed": "Last Viewed",
@@ -314,18 +314,18 @@ class EpisodeMenu(QMenu):
 
     def __init__(self, parent=None):
         super().__init__(parent=parent)
-        self.title_action = QAction("Title")
+        self.title_action = QAction("Episode Title")
         self.title_action.setCheckable(True)
         self.addAction(self.title_action)
-        self.title_action.toggled.connect(lambda: self.columnToggled("Title"))
-        self.number_action = QAction("Number")
+        self.title_action.toggled.connect(lambda: self.columnToggled("Episode Title"))
+        self.number_action = QAction("Episode Number")
         self.number_action.setCheckable(True)
         self.addAction(self.number_action)
-        self.number_action.toggled.connect(lambda: self.columnToggled("Number"))
-        self.rating_action = QAction("Rating")
+        self.number_action.toggled.connect(lambda: self.columnToggled("Episode Number"))
+        self.rating_action = QAction("Episode Rating")
         self.rating_action.setCheckable(True)
         self.addAction(self.rating_action)
-        self.rating_action.toggled.connect(lambda: self.columnToggled("Rating"))
+        self.rating_action.toggled.connect(lambda: self.columnToggled("Episode Rating"))
         self.playcount_action = QAction("Play Count")
         self.playcount_action.setCheckable(True)
         self.addAction(self.playcount_action)
@@ -340,6 +340,10 @@ class EpisodeMenu(QMenu):
         self.addAction(self.watched_action)
         self.watched_action.setCheckable(True)
         self.watched_action.toggled.connect(lambda: self.columnToggled("Watched"))
+        self.dateadded_action = QAction("Date Added")
+        self.addAction(self.dateadded_action)
+        self.dateadded_action.setCheckable(True)
+        self.dateadded_action.toggled.connect(lambda: self.columnToggled("Date Added"))
         self.pin_action = QAction("Pin")
         self.addAction(self.pin_action)
         self.pin_action.setCheckable(True)
