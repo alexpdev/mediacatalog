@@ -13,3 +13,10 @@
 - Changed the backend for scraping information for TV section,
 - Changed the color scheme for labels.
 - Bug fixes.
+
+## Version 0.4
+
+- Changes to the headers for the tv tab
+- added backup transfer for database when incompatable changes are detected
+- Added icon delegates for pin and watched columns
+- added icons for scroll bars

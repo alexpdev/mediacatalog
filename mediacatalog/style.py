@@ -505,6 +505,19 @@ QStatusBar::item
     background: transparent;
     color: rgba(0, 88, 226, 255);
 }
+QScrollBar:down-arrow:vertical {
+    image: url(%(cdown)s);
+}
+QScrollBar:up-arrow:vertical {
+    image: url(%(cup)s);
+}
+QScrollBar:left-arrow:horizontal {
+    image: url(%(left)s);
+}
+
+QScrollBar::right-arrow:horizontal {
+    image: url(%(right)s);
+}
 QScrollBar:horizontal
 {
     border: 0;
@@ -744,6 +757,10 @@ def style():
 
     vals = {
         "up": urlpath(getfile("up")),
-        "down": urlpath(getfile("down"))
+        "down": urlpath(getfile("down")),
+        "left":  urlpath(getfile("caret-left")),
+        "right":  urlpath(getfile("caret-right")),
+        "cup":  urlpath(getfile("caret-up")),
+        "cdown":  urlpath(getfile("caret-down")),
     }
     return _style % vals
