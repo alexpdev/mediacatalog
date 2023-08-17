@@ -20,3 +20,9 @@
 - added backup transfer for database when incompatable changes are detected
 - Added icon delegates for pin and watched columns
 - added icons for scroll bars
+
+## Version 0.5
+
+- Added the recently viewed list feature
+- Added a delete row feature that deletes the actual folder as well
+- Added a border around the filters section

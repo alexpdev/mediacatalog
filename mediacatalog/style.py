@@ -89,7 +89,6 @@ QStatusBar
 QToolBar
 {
     border-top: 1px solid rgba(255, 255, 255, 255);
-    border-bottom: 1px solid rgba(205, 205, 205, 255);
     color: rgba(25, 25, 25, 255);
 }
 QToolButton
@@ -613,16 +612,9 @@ QScrollBar::sub-line:vertical
     subcontrol-position: top;
     subcontrol-origin: margin;
 }
-QMainWindow::separator
-{
-    width: 3px;
-}
 QSplitter::handle
 {
-    border-radius: 0px;
-    width: 2px;
-    height: 5px;
-    margin: 0px;
+    image: url(%(splitter)s);
 }
 QWidget[class="scrollBack"] {
     /* background-image: url('./assets/wooden-texture.png') 0 0 0 0 stretch stretch; */
@@ -762,5 +754,6 @@ def style():
         "right":  urlpath(getfile("caret-right")),
         "cup":  urlpath(getfile("caret-up")),
         "cdown":  urlpath(getfile("caret-down")),
+        "splitter": urlpath(getfile("splitter")),
     }
     return _style % vals
