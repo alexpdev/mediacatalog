@@ -200,6 +200,10 @@ class SqlDatabase:
         settings[key] = value
         self.set_settings(settings)
 
+    def dropRow(self, table, path):
+        cursor = self.conn.cursor()
+        cursor.execute(f'DELETE FROM {table} WHERE "path" = ?', (path,))
+        self.conn.commit()
 
     def refresh_database(self, deep=False):
         cursor = self.conn.cursor()
@@ -295,3 +299,28 @@ class SqlDatabase:
         cursor = self.conn.cursor()
         cursor.execute(f"SELECT * FROM {table}")
         return cursor.fetchall()
+
+    def getRecent(self):
+        cursor = self.conn.cursor()
+        results = []
+        for table in ["movies", "ufc", "documentaries"]:
+            cursor.execute(f"SELECT * FROM {table}")
+            for row in cursor.fetchall():
+                data = json.loads(row[-1])
+                if data["lastviewed"]:
+                    dt = datetime.datetime.strptime(data["lastviewed"], "%m-%d-%Y")
+                    data["table"] = table
+                    data["dt"] = dt
+                    results.append(data)
+        cursor.execute(f"SELECT * FROM tv")
+        for row in cursor.fetchall():
+            data = json.loads(row[-1])
+            for season in data["seasons"]:
+                for episode in data["seasons"][season]:
+                    if episode["lastviewed"]:
+                        dt = datetime.datetime.strptime(episode["lastviewed"], "%m-%d-%Y")
+                        episode["table"] = "tv"
+                        episode["dt"] = dt
+                        episode["foldername"] = data["foldername"]
+                        results.append(episode)
+        return sorted(results, key=lambda x: x["dt"], reverse=True)

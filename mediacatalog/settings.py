@@ -17,7 +17,7 @@ class Settings:
         "documentaries":[],
         "documentariesprofilefields": list(MAPPING.keys()),
         "moviesprofilefields": list(MAPPING.keys()),
-        "tvprofilefields": list(utils.TV_MAPPING.keys()),
+        "tvprofilefields": list(utils.TV_MAPPING.keys()) + list(EPISODE.keys()),
         "ufcprofilefields": list(MAPPING.keys()),
         "documentariescolumnfields": list(MAPPING.keys()),
         "moviescolumnfields": list(MAPPING.keys()),
@@ -53,6 +53,11 @@ def updateField(table, foldername, key, value):
 def getData(table):
     return Settings.db.getData(table)
 
+def dropRow(table, path):
+    Settings.db.dropRow(table, path)
+
+def getRecent():
+    return Settings.db.getRecent()
 
 class GroupBox(QGroupBox):
     somethingChanged = Signal()
@@ -154,6 +159,7 @@ class FieldBox(QGroupBox):
         super().__init__(title, parent=parent)
         self._title = title
         self._field = field
+        (self._field, self._title)
         self.layout = QVBoxLayout(self)
         self.list = QListWidget()
         self.layout.addWidget(self.list)
@@ -162,7 +168,12 @@ class FieldBox(QGroupBox):
 
     def refresh_list(self):
         options = setting(self._field)
-        for key, value in MAPPING.items():
+        if "TV" in self._title:
+            mapping = list(utils.TV_MAPPING.items())
+            mapping += list(utils.EPISODE.items())
+        else:
+            mapping = list(MAPPING.items())
+        for key, value in mapping:
             item = QListWidgetItem()
             item.setText(value)
             if key in options:
@@ -339,3 +350,15 @@ class DirectorySelectionDialog(QDialog):
     def directory(self):
         file_info = self.model.fileInfo(self.tree_view.selectionModel().currentIndex())
         return Path(file_info.absoluteFilePath())
+
+
+class RecentDialog(QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent=parent)
+        layout = QVBoxLayout(self)
+        self.list = QListWidget()
+        layout.addWidget(self.list)
+        for row in getRecent():
+            item = QListWidgetItem()
+            item.setText(row["foldername"])
+            self.list.addItem(item)

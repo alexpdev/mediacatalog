@@ -7,7 +7,7 @@ from PySide6.QtGui import *
 from mediacatalog.db import SqlDatabase
 from mediacatalog.style import style
 from mediacatalog.utils import geticon, LOCAL
-from mediacatalog.settings import SettingsWidget, setting, setSetting
+from mediacatalog.settings import SettingsWidget, setting, setSetting, RecentDialog
 from mediacatalog.mediapage import MediaPage, TvPage
 
 
@@ -37,6 +37,7 @@ class Window(QMainWindow):
         self.central.addWidget(self.settings)
         for tab in [self.movies, self.tv, self.ufc, self.documentaries]:
             tab.toSettings.connect(self.onToSettings)
+            tab.toolbar.recent_list_action.triggered.connect(self.show_recent)
         # self.menubar = self.menuBar()
         # self.filemenu = QMenu("File")
         # self.exitAction = QAction("Exit", self)
@@ -51,6 +52,10 @@ class Window(QMainWindow):
         self.setCentralWidget(self.central)
         self.settings.somethingChanged.connect(self.update_tables)
         self.resize(*self.db.setting("windowsize"))
+
+    def show_recent(self):
+        recentdialog = RecentDialog()
+        recentdialog.exec()
 
     def onToHome(self):
         self.central.setCurrentWidget(self.tabs)

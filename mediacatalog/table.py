@@ -373,7 +373,6 @@ class PinDelegate(QStyledItemDelegate):
 
     def paint(self, painter, option, index):
         value = self.parent().model().data(index, Qt.ItemDataRole.DisplayRole)
-        print(value)
         if value:
             icon = geticon("pin")
             icon.paint(painter, option.rect, Qt.AlignCenter)

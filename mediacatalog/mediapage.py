@@ -1,3 +1,4 @@
+import shutil
 import subprocess
 from datetime import datetime
 import webbrowser
@@ -9,7 +10,7 @@ from PySide6.QtGui import *
 from mediacatalog import utils
 from mediacatalog.utils import MAPPING, EPISODE, geticon
 from mediacatalog.table import TableView, ListView
-from mediacatalog.settings import setting, setSetting, updateField
+from mediacatalog.settings import setting, setSetting, updateField, dropRow
 
 
 def reverse_mapping(field, mapping=MAPPING):
@@ -57,6 +58,7 @@ class MediaProfile(QWidget):
         self.layout.addWidget(self.scrollarea)
         self.fields = {}
         self.add_fields()
+
 
     def add_fields(self):
         for key, value in MAPPING.items():
@@ -169,66 +171,76 @@ class ToolBar(QToolBar):
 
     def __init__(self, parent=None):
         super().__init__(parent=parent)
+        self.settingsAction = QAction(geticon("settings"), "Settings", self)
+        self.addAction(self.settingsAction)
         left = QWidget()
         left.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         left.setFixedHeight(0)
         self.addWidget(left)
+        self.filter_group = QGroupBox()
+        self.filter_layout = QHBoxLayout(self.filter_group)
+        self.filter_layout.setContentsMargins(2,2,2,2)
+        self.filter_layout.setSpacing(0)
+        self.filter_group.setContentsMargins(0,0,0,0)
+        self.filter_toolbar = QToolBar()
+        self.filter_layout.addWidget(self.filter_toolbar)
         title = QLabel("Title")
-        self.addWidget(title)
+        self.filter_toolbar.addWidget(title)
         self.title_line = QLineEdit()
         self.title_line.setMaximumWidth(100)
-        self.addWidget(self.title_line)
-        self.addSeparator()
+        self.filter_toolbar.addWidget(self.title_line)
+        self.filter_toolbar.addSeparator()
         self.quality = QToolButton()
         self.quality.setProperty("class", "filter")
         self.quality.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
         self.quality.setText("Quality")
-        self.addWidget(self.quality)
-        self.addSeparator()
+        self.filter_toolbar.addWidget(self.quality)
+        self.filter_toolbar.addSeparator()
         self.genre = QToolButton()
         self.genre.setProperty("class", "filter")
         self.genre.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
         self.genre.setText("Genre")
-        self.addWidget(self.genre)
-        self.addSeparator()
+        self.filter_toolbar.addWidget(self.genre)
+        self.filter_toolbar.addSeparator()
         self.status = QToolButton()
         self.status.setProperty("class", "filter")
         self.status.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
         self.status.setText("Status")
-        self.addWidget(self.status)
-        self.addSeparator()
+        self.filter_toolbar.addWidget(self.status)
+        self.filter_toolbar.addSeparator()
         self.watched = QToolButton()
         self.watched.setProperty("class", "filter")
         self.watched.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
         self.watched.setText("Watched")
-        self.addWidget(self.watched)
-        self.addSeparator()
+        self.filter_toolbar.addWidget(self.watched)
+        self.filter_toolbar.addSeparator()
         self.rating = QToolButton()
         self.rating.setProperty("class", "filter")
         self.rating.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
         self.rating.setText("Rating")
-        self.addWidget(self.rating)
-        self.addSeparator()
+        self.filter_toolbar.addWidget(self.rating)
+        self.filter_toolbar.addSeparator()
         folder_size = QLabel("Folder Size")
-        self.addWidget(folder_size)
+        self.filter_toolbar.addWidget(folder_size)
         self.folder_size_combo = QComboBox()
         self.folder_size_combo.setMaximumWidth(45)
         for i in [">", "<", "="]:
             self.folder_size_combo.addItem(i)
-        self.addWidget(self.folder_size_combo)
+        self.filter_toolbar.addWidget(self.folder_size_combo)
         self.folder_size_value = QSpinBox()
         self.folder_size_value.setRange(0, 1000000000)
-        self.addWidget(self.folder_size_value)
-        self.addSeparator()
+        self.filter_toolbar.addWidget(self.folder_size_value)
+        self.addWidget(self.filter_group)
         right = QWidget()
         right.setFixedHeight(0)
         right.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.addWidget(right)
-        self.settingsAction = QAction(geticon("settings"), "Settings", self)
-        self.addAction(self.settingsAction)
+        self.recent_list_action = QAction(geticon("list"), "Recently Watched", self)
+        self.addAction(self.recent_list_action)
+        self.delete_action = QAction(geticon("trash"), "Delete", self)
+        self.addAction(self.delete_action)
         self.setupMenus()
         self.setupSignals()
-
 
     def onChange(self, *args):
         self.somethingChanged.emit()
@@ -323,6 +335,7 @@ class MediaPage(QWidget):
         self.layout.addWidget(self.splitter2)
         self.toolbar = ToolBar(self)
         self.toolbar.somethingChanged.connect(self.filter_table)
+        self.toolbar.delete_action.triggered.connect(self.on_delete)
         self.toolbar.settingsAction.triggered.connect(self.go_to_settings)
         self.splitter2.addWidget(self.toolbar)
         self.widget = QWidget()
@@ -344,6 +357,17 @@ class MediaPage(QWidget):
         self.splitter2.splitterMoved.connect(self.updateSplitterSizes)
         self.add_extras()
 
+    def on_delete(self):
+        current = self.table.selectionModel().currentIndex()
+        row = self.table.model().mapToSource(current)
+        data = self.table.tableModel().getRow(row)
+        text = data["foldername"]
+        value = QMessageBox.question(self, f"Delete {text}", "Are you sure?", QMessageBox.StandardButton.Yes, QMessageBox.StandardButton.No)
+        if value == QMessageBox.StandardButton.Yes:
+            shutil.rmtree(data["folderpath"])
+            dropRow(self._table, data["path"])
+
+
     def filter_table(self):
         filters = self.toolbar.gather_values()
         self.table.filter(filters)
@@ -358,7 +382,7 @@ class MediaPage(QWidget):
         self.table.selectRow(0)
 
     def onFieldChanged(self, field, value):
-        current = self.table.selectionModel().selectedRows()[0]
+        current = self.table.selectionModel().currentIndex()
         row = self.table.model().mapToSource(current)
         data = self.table.tableModel().getRow(row)
         foldername = data["foldername"]
@@ -421,9 +445,20 @@ class TvPage(QWidget):
         )
         self.addMediaProfile()
 
+    def on_delete(self):
+        current = self.table.selectionModel().currentIndex()
+        row = self.table.model().mapToSource(current)
+        data = self.table.tableModel().getRow(row)
+        text = data["foldername"]
+        value = QMessageBox.question(self, f"Delete {text}", "Are you sure?", QMessageBox.StandardButton.Yes, QMessageBox.StandardButton.No)
+        if value == QMessageBox.StandardButton.Yes:
+            shutil.rmtree(data["folderpath"])
+            dropRow(self._table, data["path"])
+
     def filter_table(self):
         filters = self.toolbar.gather_values()
         self.table.filter(filters)
+        self.episode_table.filter(filters)
 
     def addMediaProfile(self):
         self.mediaProfile = TvMediaProfile("tv", self)
