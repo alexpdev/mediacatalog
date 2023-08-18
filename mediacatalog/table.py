@@ -169,6 +169,7 @@ class TableModel(QAbstractTableModel):
     def removeRow(self, row, parent=QModelIndex()):
         self.beginRemoveRows(parent, row, row)
         del self._data[row]
+        del self._master[row]
         self.endRemoveRows()
 
     def insertRow(self, row, value, parent=QModelIndex()):
@@ -243,6 +244,10 @@ class TableModel(QAbstractTableModel):
             if role == Qt.ItemDataRole.DisplayRole:
                 return text
             if role == 100:
+                if text == "true":
+                    return True
+                elif text == "false":
+                    return False
                 try:
                     return float(text)
                 except:
@@ -334,9 +339,13 @@ class Delegate(QStyledItemDelegate):
             if value != "unwatched":
                 icon = geticon("check")
                 icon.paint(painter, option.rect, Qt.AlignCenter)
+            else:
+                return
         elif header == "Pin":
             if value:
                 icon = geticon("pin")
                 icon.paint(painter, option.rect, Qt.AlignCenter)
+            else:
+                return
         else:
             super().paint(painter, option, index)

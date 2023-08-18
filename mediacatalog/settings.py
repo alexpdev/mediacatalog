@@ -207,6 +207,7 @@ class FieldBox(QGroupBox):
         for key, value in mapping:
             if value in paths:
                 fields.append(key)
+        setSetting(self._field.lower(), fields)
         self.somethingChanged.emit(self._field.lower(), fields)
 
 
@@ -297,7 +298,8 @@ class SettingsWidget(QWidget):
     def update_settings(self, *args):
         if len(args) == 2:
             key, value = args
-            setSetting(key, value)
+            if value:
+                setSetting(key, value)
         Settings.db.refresh_database()
         self.somethingChanged.emit()
 

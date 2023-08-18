@@ -182,7 +182,7 @@ def nfo_to_dict(content):
     record["comments"] = ""
     record["quality"] = ""
     record["watched"] = "unwatched"
-    record["pin"] = False
+    record["pin"] = "0"
     if record["runtime"] is None:
         record["runtime"] = 0
     if record["status"] is None:

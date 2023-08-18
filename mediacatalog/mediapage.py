@@ -114,7 +114,6 @@ class MediaProfile(QWidget):
         )
 
     def setCurrent(self, data):
-        print(data)
         fields = setting(f"{self._table}profilefields")
         self.images = None
         if "image_cached" in data:
