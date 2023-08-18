@@ -1,16 +1,16 @@
-import os
 import datetime
-import sqlite3
 import json
+import os
 import shutil
+import sqlite3
 from hashlib import md5
 
-from PySide6.QtWidgets import *
 from PySide6.QtCore import *
 from PySide6.QtGui import *
+from PySide6.QtWidgets import *
 
-from mediacatalog.utils import nfo_to_dict, MAPPING, tv_nfo_to_dict
 from mediacatalog.settings import Settings, setting
+from mediacatalog.utils import MAPPING, nfo_to_dict, tv_nfo_to_dict
 
 
 class Diff:
@@ -46,6 +46,7 @@ def find_image_files(path):
             paths += find_image_files(fullpath)
     return paths
 
+
 def find_nfo(path):
     if not os.path.isdir(path):
         return None
@@ -53,6 +54,7 @@ def find_nfo(path):
         if os.path.splitext(item)[-1].lower() == ".nfo":
             return os.path.join(path, item)
     return None
+
 
 def scan_videos(path):
     video_files = []
@@ -79,28 +81,33 @@ def scan_media(path, paths):
         fullpath = os.path.join(path, item)
         if fullpath in paths:
             continue
-        record["foldername"] = item
-        record["path"] = fullpath
-        record["foldersize"] = get_folder_size(fullpath)
-        record["images"] = find_image_files(fullpath)
-        nfo = find_nfo(fullpath)
-        if nfo is not None:
-            with open(nfo, "rt", encoding="utf8") as nfofile:
-                content = nfofile.read()
-        else:
-            content = None
-        record.update(nfo_to_dict(content))
-        record["nfopath"] = nfo
-        parts = item.split()
         try:
-            record["foldertitle"] = parts[0]
-            record["folderyear"] = parts[1].strip("()")
-            record["folderimdb"] = parts[2].strip("()")
-        except IndexError:
-            pass
-        record["videofiles"] = scan_videos(fullpath)
-        records.append(record)
+            record["foldername"] = item
+            record["path"] = fullpath
+            record["foldersize"] = get_folder_size(fullpath)
+            record["images"] = find_image_files(fullpath)
+            nfo = find_nfo(fullpath)
+            if nfo is not None:
+                with open(nfo, "rt", encoding="utf8") as nfofile:
+                    content = nfofile.read()
+            else:
+                content = None
+            record.update(nfo_to_dict(content))
+            record["nfopath"] = nfo
+            parts = item.split()
+            try:
+                record["foldertitle"] = parts[0]
+                record["folderyear"] = parts[1].strip("()")
+                record["folderimdb"] = parts[2].strip("()")
+            except IndexError:
+                pass
+            record["videofiles"] = scan_videos(fullpath)
+            records.append(record)
+        except Exception as e:
+            print(e)
+            print(fullpath)
     return records
+
 
 def scan_tv_media(paths, path, new):
     if not path:
@@ -136,6 +143,7 @@ def scan_tv_media(paths, path, new):
         records.append(record)
     return records
 
+
 def scan_seasons(record, path, new):
     for item in os.listdir(path):
         fullpath = os.path.join(path, item)
@@ -164,8 +172,8 @@ def scan_seasons(record, path, new):
                 record["seasons"][item].append(episode)
                 new.append(episode)
 
-class SqlDatabase:
 
+class SqlDatabase:
     def __init__(self, path):
         self.path = path
         self.missing_content = []
@@ -174,6 +182,8 @@ class SqlDatabase:
         self.conn = sqlite3.connect(path)
         self.refresh_database()
 
+    def close(self):
+        self.conn.close()
 
     def settings(self):
         cursor = self.conn.cursor()
@@ -184,7 +194,10 @@ class SqlDatabase:
 
     def set_settings(self, settings):
         cursor = self.conn.cursor()
-        cursor.execute('UPDATE settings SET "value" = ? WHERE "key" = ?', (json.dumps(settings), "settings"))
+        cursor.execute(
+            'UPDATE settings SET "value" = ? WHERE "key" = ?',
+            (json.dumps(settings), "settings"),
+        )
         self.conn.commit()
 
     def setting(self, key):
@@ -277,7 +290,10 @@ class SqlDatabase:
         cursor.execute("CREATE TABLE ufc(path, foldername, json)")
         cursor.execute("CREATE TABLE documentaries(path, foldername, json)")
         cursor.execute("CREATE TABLE settings(key, value)")
-        cursor.execute("INSERT INTO settings VALUES(?, ?)", ("settings", json.dumps(Settings.default)))
+        cursor.execute(
+            "INSERT INTO settings VALUES(?, ?)",
+            ("settings", json.dumps(Settings.default)),
+        )
         con.commit()
 
     def updateField(self, table, foldername, key, value):
@@ -317,7 +333,9 @@ class SqlDatabase:
             for season in data["seasons"]:
                 for episode in data["seasons"][season]:
                     if episode["lastviewed"]:
-                        dt = datetime.datetime.strptime(episode["lastviewed"], "%m-%d-%Y")
+                        dt = datetime.datetime.strptime(
+                            episode["lastviewed"], "%m-%d-%Y"
+                        )
                         episode["table"] = "tv"
                         episode["dt"] = dt
                         episode["foldername"] = data["foldername"]

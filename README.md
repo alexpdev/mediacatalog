@@ -16,7 +16,6 @@ It then pulls poster art from the folder and also reads a .nfo file for informat
 - [x] Quicker updates or auto updates, should pull the plot and genres
 - [x] Filtering
 - [x] Pin movies or mark them to put them in a shortlist (like if I want to watch it soon like My List on netflix)
-- ~~(Would be nice) Change views, view disc art, dvd covers, etc~~
 - [x] Fun stats like watch count of a movie, total number of movies, watched X / Y, X%, etc
 - [x] Runtime
 - [x] Should be visual distinction for movies that are deleted

@@ -1,20 +1,21 @@
-from pathlib import Path
 import json
 import os
+from pathlib import Path
 
-from mediacatalog import utils
-from mediacatalog.utils import MAPPING, EPISODE, GENRES, QUALITY, geticon
-
-from PySide6.QtWidgets import *
 from PySide6.QtCore import *
 from PySide6.QtGui import *
+from PySide6.QtWidgets import *
+
+from mediacatalog import utils
+from mediacatalog.utils import EPISODE, GENRES, MAPPING, QUALITY, geticon
+
 
 class Settings:
     default = {
-        'movies': [],
+        "movies": [],
         "tv": [],
         "ufc": [],
-        "documentaries":[],
+        "documentaries": [],
         "documentariesprofilefields": list(MAPPING.keys()),
         "moviesprofilefields": list(MAPPING.keys()),
         "tvprofilefields": list(utils.TV_MAPPING.keys()) + list(EPISODE.keys()),
@@ -31,10 +32,10 @@ class Settings:
         "tvtoolbarslider": [0, 647],
         "moviestoolbarslider": [0, 647],
         "ufctoolbarslider": [0, 647],
-        "documentariesmediaslider":[900,353],
-        "moviesmediaslider":[900,353],
-        "ufcmediaslider": [900,353],
-        "tvmediaslider":[]
+        "documentariesmediaslider": [900, 353],
+        "moviesmediaslider": [900, 353],
+        "ufcmediaslider": [900, 353],
+        "tvmediaslider": [],
     }
     current = None
     db = None
@@ -43,21 +44,31 @@ class Settings:
 def setting(key):
     return Settings.current[key]
 
+
 def setSetting(key, value):
     Settings.current[key] = value
     Settings.db.set_settings(Settings.current)
 
+
 def updateField(table, foldername, key, value):
     Settings.db.updateField(table, foldername, key, value)
+
 
 def getData(table):
     return Settings.db.getData(table)
 
+
 def dropRow(table, path):
     Settings.db.dropRow(table, path)
 
+
 def getRecent():
     return Settings.db.getRecent()
+
+
+def connectionClose():
+    Settings.db.close()
+
 
 class GroupBox(QGroupBox):
     somethingChanged = Signal()
@@ -88,7 +99,6 @@ class GroupBox(QGroupBox):
         if result:
             result = Path(result).resolve()
             self.add_folder(str(result))
-
 
     def onChange(self):
         items = [self.list.item(i) for i in range(self.list.count())]
@@ -190,7 +200,11 @@ class FieldBox(QGroupBox):
             if item and item.text() and item.checkState() == Qt.CheckState.Checked
         ]
         fields = []
-        for key, value in MAPPING.items():
+        if "TV" in self._title:
+            mapping = list(utils.TV_MAPPING.items()) + list(utils.EPISODE.items())
+        else:
+            mapping = list(MAPPING.items())
+        for key, value in mapping:
             if value in paths:
                 fields.append(key)
         self.somethingChanged.emit(self._field.lower(), fields)

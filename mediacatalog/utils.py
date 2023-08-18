@@ -4,11 +4,9 @@ from datetime import datetime
 from pathlib import Path
 
 import parsel
-
-from PySide6.QtWidgets import *
 from PySide6.QtCore import *
 from PySide6.QtGui import *
-
+from PySide6.QtWidgets import *
 
 PARENT = Path(__file__).parent.parent
 ASSETS = PARENT / "assets"
@@ -31,6 +29,7 @@ def getimage(text):
 
 def geticon(text):
     return QIcon(getimage(text))
+
 
 EPISODE = {
     "episodetitle": "Episode Title",
@@ -100,9 +99,7 @@ STATUS = [
     "New",
 ]
 
-RATING = [
-    "0.0", "0.5", "1.0", "1.5", "2.0", "2.5", "3.0", "3.5", "4.0", "4.5", "5.0"
-]
+RATING = ["0.0", "0.5", "1.0", "1.5", "2.0", "2.5", "3.0", "3.5", "4.0", "4.5", "5.0"]
 
 GENRES = [
     "Action",
@@ -199,6 +196,7 @@ def nfo_to_dict(content):
     if record["lastviewed"] == None:
         record["lastviewed"] = ""
     return record
+
 
 def tv_nfo_to_dict(content):
     record = {}
@@ -485,7 +483,6 @@ class ColumnMenu(QMenu):
         for action in self.actions():
             if action.text() in lst:
                 action.setChecked(True)
-
 
 
 class TvColumnMenu(QMenu):

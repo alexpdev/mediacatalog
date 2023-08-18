@@ -1,14 +1,15 @@
 import os
 
-from PySide6.QtWidgets import *
 from PySide6.QtCore import *
 from PySide6.QtGui import *
+from PySide6.QtWidgets import *
 
 from mediacatalog.db import SqlDatabase
-from mediacatalog.style import style
-from mediacatalog.utils import geticon, LOCAL
-from mediacatalog.settings import SettingsWidget, setting, setSetting, RecentDialog
 from mediacatalog.mediapage import MediaPage, TvPage
+from mediacatalog.settings import (RecentDialog, SettingsWidget,
+                                   connectionClose, setSetting, setting)
+from mediacatalog.style import style
+from mediacatalog.utils import LOCAL, geticon
 
 
 class Window(QMainWindow):
@@ -38,17 +39,7 @@ class Window(QMainWindow):
         for tab in [self.movies, self.tv, self.ufc, self.documentaries]:
             tab.toSettings.connect(self.onToSettings)
             tab.toolbar.recent_list_action.triggered.connect(self.show_recent)
-        # self.menubar = self.menuBar()
-        # self.filemenu = QMenu("File")
-        # self.exitAction = QAction("Exit", self)
-        # self.exitAction.triggered.connect(self.close)
-        # self.settingsAction = QAction("Settings", self)
-        # self.filemenu.addAction(self.settingsAction)
-        # self.filemenu.addSeparator()
-        # self.filemenu.addAction(self.exitAction)
-        # self.settingsAction.triggered.connect(self.openSettings)
         self.settings.toHome.connect(self.onToHome)
-        # self.menubar.addMenu(self.filemenu)
         self.setCentralWidget(self.central)
         self.settings.somethingChanged.connect(self.update_tables)
         self.resize(*self.db.setting("windowsize"))
@@ -91,14 +82,21 @@ def execute():
         window = Window()
     except Exception as e:
         print(e)
-        temp = [[],[],[],[]]
+        temp = [[], [], [], []]
         try:
-            temp = [setting("tv"), setting("movies"), setting("ufc"), setting("documentaries")]
+            temp = [
+                setting("tv"),
+                setting("movies"),
+                setting("ufc"),
+                setting("documentaries"),
+            ]
         except:
             pass
+
+        connectionClose()
         os.remove(LOCAL / "media.db")
         window = Window()
-        for key, value in zip(["tv", "movies", "ufc", "documentaries"],temp):
+        for key, value in zip(["tv", "movies", "ufc", "documentaries"], temp):
             setSetting(key, value)
     window.show()
     app.exec()

@@ -1,18 +1,16 @@
 import json
-from typing import Any, Union
-import PySide6.QtCore
 
-from PySide6.QtWidgets import *
+import humanfriendly
 from PySide6.QtCore import *
 from PySide6.QtGui import *
-import humanfriendly
+from PySide6.QtWidgets import *
 
-from mediacatalog.utils import geticon
 from mediacatalog.db import Diff
-from mediacatalog.settings import setting, setSetting, getData
+from mediacatalog.settings import getData, setSetting, setting
+from mediacatalog.utils import geticon
+
 
 class ListView(QTreeView):
-
     def __init__(self, parent=None):
         super().__init__(parent=parent)
         self.setProperty("class", "Seasons")
@@ -28,7 +26,6 @@ class ListView(QTreeView):
     def current(self):
         row = self.selectionModel().currentIndex().row()
         return self.row(row)
-
 
 
 class ListModel(QAbstractListModel):
@@ -70,19 +67,16 @@ class ListModel(QAbstractListModel):
         self.removeRows(start, 1, index)
 
     def insertRows(self, start, count, index, data=[]):
-        self.beginInsertRows(QModelIndex(), start, start+count)
+        self.beginInsertRows(QModelIndex(), start, start + count)
         for i, season in enumerate(data):
-            self._seasons.insert(start+i, season)
+            self._seasons.insert(start + i, season)
         self.endInsertRows()
 
     def removeRows(self, start, count, index):
-        self.beginRemoveRows(QModelIndex(), start, start+count)
-        for i in list(range(start, start+count))[::-1]:
+        self.beginRemoveRows(QModelIndex(), start, start + count)
+        for i in list(range(start, start + count))[::-1]:
             del self._seasons[i]
         self.endRemoveRows()
-
-
-
 
 
 class TableModel(QAbstractTableModel):
@@ -110,7 +104,10 @@ class TableModel(QAbstractTableModel):
             filters = self._last_filters
         data = []
         for record in self._master:
-            if filters["title"] and filters["title"].lower() not in record["title"].lower():
+            if (
+                filters["title"]
+                and filters["title"].lower() not in record["title"].lower()
+            ):
                 continue
             if filters["quality"] and record["quality"] not in filters["quality"]:
                 continue
@@ -151,7 +148,10 @@ class TableModel(QAbstractTableModel):
             self.removeColumn(index, QModelIndex())
         else:
             index = list(self._reverse.keys()).index(key)
-            self.insertColumn(index, key, QModelIndex())
+            total = sum(
+                [1 for i in list(self._reverse.keys())[:index] if i in self._headers]
+            )
+            self.insertColumn(total, key, QModelIndex())
 
     def clearRows(self):
         rows = self.rowCount(QModelIndex()) - 1
@@ -199,7 +199,9 @@ class TableModel(QAbstractTableModel):
         if orientation == Qt.Orientation.Horizontal:
             if role == Qt.ItemDataRole.DisplayRole:
                 return self._mapping[self._headers_labels[section]]
-            elif role == Qt.ItemDataRole.SizeHintRole and self._mapping[self._headers_labels[section]] in ["pin", "watched"]:
+            elif role == Qt.ItemDataRole.SizeHintRole and self._mapping[
+                self._headers_labels[section]
+            ] in ["pin", "watched"]:
                 return QSize(0, 10)
         return None
 
@@ -222,18 +224,19 @@ class TableModel(QAbstractTableModel):
             elif self._data[row]["path"] in Diff.new_content:
                 if field in Diff.new_content[self._data[row]["path"]]:
                     if role == Qt.ItemDataRole.ForegroundRole:
-                        return QBrush(QColor("#770"))
+                        return QBrush(QColor("#060"))
                     elif role == Qt.ItemDataRole.BackgroundRole:
                         return QBrush(QColor("#CCC"))
             elif field == "watched":
                 if role == Qt.ItemDataRole.DecorationRole:
                     if text and text.lower() != "unwatched":
                         return
-
             elif field == "genre":
                 if role == Qt.ItemDataRole.DisplayRole:
                     if isinstance(text, list):
                         return "  ".join(text)
+                    else:
+                        return text
             elif field == "foldersize":
                 if role == Qt.ItemDataRole.DisplayRole:
                     return humanfriendly.format_size(text)
@@ -245,7 +248,6 @@ class TableModel(QAbstractTableModel):
                 except:
                     return text
         return None
-
 
     def removeColumn(self, column, parent=QModelIndex()):
         self.beginRemoveColumns(parent, column, column)
@@ -273,13 +275,8 @@ class TableView(QTableView):
         self.setModel(self._proxy_model)
         self._proxy_model.setSourceModel(self._model)
         self._proxy_model.setDynamicSortFilter(True)
-        headers = self._model.headers()
-        if "Pin" in headers:
-            self._pin_delegate = PinDelegate(self)
-            self.setItemDelegateForColumn(headers.index("Pin"), self._pin_delegate)
-        if "Watched" in headers:
-            self._watched_delegate = WatchedDelegate(self)
-            self.setItemDelegateForColumn(headers.index("Watched"), self._watched_delegate)
+        self._delegate = Delegate(self)
+        self.setItemDelegate(self._delegate)
         self.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.horizontalHeader().setContextMenuPolicy(
@@ -309,81 +306,37 @@ class TableView(QTableView):
         self.tableModel().apply_filters(filters)
 
 
-class CheckBoxDelegate(QStyledItemDelegate):
+# class PinDelegate(QStyledItemDelegate):
+#     def __init__(self, parent=None):
+#         super().__init__(parent)
 
-    createEditor = lambda self, _, __, ___: None
-
-    def paint(self, painter, option, index):
-        checked = bool(index.model().data(index, Qt.DisplayRole))
-        check_box_style_option = QStyleOptionButton()
-
-        if (index.flags() & Qt.ItemIsEditable) > 0:
-            check_box_style_option.state |= QStyle.State_Enabled
-        else:
-            check_box_style_option.state |= QStyle.State_ReadOnly
-
-        if checked:
-            check_box_style_option.state |= QStyle.State_On
-        else:
-            check_box_style_option.state |= QStyle.State_Off
-
-        check_box_style_option.rect = self.getCheckBoxRect(option)
-        if not index.model().hasFlag(index, Qt.ItemFlag.ItemIsEditable):
-            check_box_style_option.state |= QStyle.State_ReadOnly
-        QApplication.style().drawControl(QStyle.CE_CheckBox, check_box_style_option, painter)
+#     def paint(self, painter, option, index):
+#         value = self.parent().model().data(index, Qt.ItemDataRole.DisplayRole)
+#         if value:
+#             icon = geticon("pin")
+#             icon.paint(painter, option.rect, Qt.AlignCenter)
 
 
-    def editorEvent(self, event, model, option, index):
-        if not (index.flags() & Qt.ItemIsEditable) > 0:
-            return False
-        if event.type() == QEvent.MouseButtonRelease or event.type() == QEvent.MouseButtonDblClick:
-            if event.button() != Qt.LeftButton or not self.getCheckBoxRect(option).contains(event.pos()):
-                return False
-            if event.type() == QEvent.MouseButtonDblClick:
-                return True
-        elif event.type() == QEvent.KeyPress:
-            if event.key() != Qt.Key_Space and event.key() != Qt.Key_Select:
-                return False
-        else:
-            return False
-        self.setModelData(None, model, index)
-        return True
-
-    def setModelData (self, editor, model, index):
-        newValue = not bool(index.model().data(index, Qt.DisplayRole))
-        model.setData(index, newValue, Qt.EditRole)
-
-
-    def getCheckBoxRect(self, option):
-        check_box_style_option = QStyleOptionButton()
-        check_box_rect = QApplication.style().subElementRect(QStyle.SE_CheckBoxIndicator, check_box_style_option, None)
-        check_box_point = QPoint (option.rect.x() +
-                             option.rect.width() / 2 -
-                             check_box_rect.width() / 2,
-                             option.rect.y() +
-                             option.rect.height() / 2 -
-                             check_box_rect.height() / 2)
-        return QRect(check_box_point, check_box_rect.size())
-
-
-class PinDelegate(QStyledItemDelegate):
+class Delegate(QStyledItemDelegate):
     def __init__(self, parent=None):
         super().__init__(parent)
 
-
     def paint(self, painter, option, index):
+        header = (
+            self.parent()
+            .model()
+            .headerData(
+                index.column(), Qt.Orientation.Horizontal, Qt.ItemDataRole.DisplayRole
+            )
+        )
         value = self.parent().model().data(index, Qt.ItemDataRole.DisplayRole)
-        if value:
-            icon = geticon("pin")
-            icon.paint(painter, option.rect, Qt.AlignCenter)
-
-class WatchedDelegate(QStyledItemDelegate):
-    def __init__(self, parent=None):
-        super().__init__(parent)
-
-
-    def paint(self, painter, option, index):
-        value = self.parent().model().data(index, Qt.ItemDataRole.DisplayRole)
-        if value != "unwatched":
-            icon = geticon("check")
-            icon.paint(painter, option.rect, Qt.AlignCenter)
+        if header == "Watched":
+            if value != "unwatched":
+                icon = geticon("check")
+                icon.paint(painter, option.rect, Qt.AlignCenter)
+        elif header == "Pin":
+            if value:
+                icon = geticon("pin")
+                icon.paint(painter, option.rect, Qt.AlignCenter)
+        else:
+            super().paint(painter, option, index)

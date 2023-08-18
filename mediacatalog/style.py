@@ -1,6 +1,7 @@
 import os
 from urllib.request import pathname2url
-from mediacatalog.utils import getfile, PARENT
+
+from mediacatalog.utils import PARENT, getfile
 
 _style = """
 QWidget
@@ -738,22 +739,21 @@ QToolButton::menu-indicator:pressed, QToolButton::menu-indicator:open {
 }
 """
 
+
 def urlpath(path):
     val = os.path.relpath(path, PARENT)
     val = pathname2url(val)
     return val
 
 
-
 def style():
-
     vals = {
         "up": urlpath(getfile("up")),
         "down": urlpath(getfile("down")),
-        "left":  urlpath(getfile("caret-left")),
-        "right":  urlpath(getfile("caret-right")),
-        "cup":  urlpath(getfile("caret-up")),
-        "cdown":  urlpath(getfile("caret-down")),
+        "left": urlpath(getfile("caret-left")),
+        "right": urlpath(getfile("caret-right")),
+        "cup": urlpath(getfile("caret-up")),
+        "cdown": urlpath(getfile("caret-down")),
         "splitter": urlpath(getfile("splitter")),
     }
     return _style % vals
