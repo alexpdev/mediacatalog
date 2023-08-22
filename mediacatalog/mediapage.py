@@ -1,9 +1,11 @@
+import random
 import shutil
 import subprocess
 import webbrowser
 from datetime import datetime
 
 import humanfriendly
+import cv2
 from PySide6.QtCore import *
 from PySide6.QtGui import *
 from PySide6.QtWidgets import *
@@ -51,7 +53,7 @@ class MediaProfile(QWidget):
         )
         self.label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.label.doubleClicked.connect(self.switchImage)
-        self.label.setFixedHeight(int(self.height() * 0.25))
+        self.label.setFixedHeight(int(self.height() * 0.45))
         self.layout.addWidget(self.label)
         self.scrollarea = QScrollArea()
         self.scrollarea.setHorizontalScrollBarPolicy(
@@ -59,10 +61,12 @@ class MediaProfile(QWidget):
         )
         self.scrollWidget = QWidget()
         self.scrollWidget.setProperty("class", "scrollBack")
-        self.setContentsMargins(5, 5, 5, 5)
+        self.setContentsMargins(3, 3, 3, 3)
+        self.layout.setSpacing(2)
         self.scrollarea.setWidget(self.scrollWidget)
         self.scrollarea.setWidgetResizable(True)
         self.scrolllayout = QVBoxLayout(self.scrollWidget)
+        self.scrolllayout.setSpacing(2)
         self.layout.addWidget(self.scrollarea)
         self.fields = {}
         self.add_fields()
@@ -114,6 +118,9 @@ class MediaProfile(QWidget):
         )
 
     def setCurrent(self, data):
+        for k,v in self.fields.items():
+            v.clear()
+            v.setData(data)
         fields = setting(f"{self._table}profilefields")
         self.images = None
         if "image_cached" in data:
@@ -136,7 +143,7 @@ class MediaProfile(QWidget):
                 v.setHidden(True)
 
     def resizeEvent(self, event):
-        self.label.setFixedHeight(int(self.height() * 0.25))
+        self.label.setFixedHeight(int(self.height() * 0.45))
         if self.images:
             self.scaleLabel()
         self.scrollWidget.setFixedWidth(self.scrollarea.viewport().width())
@@ -158,6 +165,9 @@ class ToolBar(QToolBar):
         super().__init__(parent=parent)
         self.settingsAction = QAction(geticon("settings"), "Settings", self)
         self.addAction(self.settingsAction)
+        self.randomSortAction = QAction(geticon("vertical"), "Random Sort Table", self)
+        self.addAction(self.randomSortAction)
+        self.randomSortAction.setToolTip("Random Sort")
         left = QWidget()
         left.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         left.setFixedHeight(0)
@@ -215,17 +225,41 @@ class ToolBar(QToolBar):
         self.folder_size_value = QSpinBox()
         self.folder_size_value.setRange(0, 1000000000)
         self.filter_toolbar.addWidget(self.folder_size_value)
+        self.reset = QAction("Reset")
+        self.filter_toolbar.addAction(self.reset)
+        self.reset.triggered.connect(self.on_reset)
         self.addWidget(self.filter_group)
         right = QWidget()
         right.setFixedHeight(0)
         right.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.addWidget(right)
         self.recent_list_action = QAction(geticon("list"), "Recently Watched", self)
+        self.recent_list_action.setToolTip("Recently Watched")
         self.addAction(self.recent_list_action)
         self.delete_action = QAction(geticon("trash"), "Delete", self)
         self.addAction(self.delete_action)
         self.setupMenus()
         self.setupSignals()
+
+    def on_reset(self):
+        self.title_line.clear()
+        for action in self.quality_action_group.actions():
+            if action.isChecked():
+                action.setChecked(False)
+        for action in self.rating_action_group.actions():
+            if action.isChecked():
+                action.setChecked(False)
+        for action in self.genre_action_group.actions():
+            if action.isChecked():
+                action.setChecked(False)
+        for action in self.watched_action_group.actions():
+            if action.isChecked():
+                action.setChecked(False)
+        for action in self.status_action_group.actions():
+            if action.isChecked():
+                action.setChecked(False)
+        self.folder_size_value.setValue(0)
+        self.onChange()
 
     def onChange(self, *args):
         self.somethingChanged.emit()
@@ -345,9 +379,11 @@ class MediaPage(QWidget):
         self.splitter2 = QSplitter(Qt.Orientation.Vertical)
         self.layout.addWidget(self.splitter2)
         self.toolbar = ToolBar(self)
+        self.layout.setSpacing(2)
         self.toolbar.somethingChanged.connect(self.filter_table)
         self.toolbar.delete_action.triggered.connect(self.on_delete)
         self.toolbar.settingsAction.triggered.connect(self.go_to_settings)
+        self.toolbar.randomSortAction.triggered.connect(self.random_sort_table)
         self.splitter2.addWidget(self.toolbar)
         self.widget = QWidget()
         self.splitter2.addWidget(self.widget)
@@ -367,6 +403,17 @@ class MediaPage(QWidget):
         self.splitter.splitterMoved.connect(self.updateSplitterSizes)
         self.splitter2.splitterMoved.connect(self.updateSplitterSizes)
         self.add_extras()
+        hlayout = QHBoxLayout()
+        self.count_label = QLabel("Count: ")
+        self.layout.addLayout(hlayout)
+        hlayout.addWidget(self.count_label)
+        self.table.rowCountChanged.connect(self.set_count_label)
+        self.set_count_label()
+
+    def set_count_label(self):
+        rows = self.table.tableModel().rowCount(None)
+        self.count_label.setText(f"Count: {rows}")
+
 
     def on_delete(self):
         current = self.table.selectionModel().currentIndex()
@@ -418,6 +465,12 @@ class MediaPage(QWidget):
 
     def go_to_settings(self):
         self.toSettings.emit()
+
+    def random_sort_table(self):
+        self.table.model().setRandom()
+        i = random.choice(range(self.table.model().columnCount()))
+        self.table.model().sort(i,Qt.SortOrder.AscendingOrder)
+        self.table.model().setRandom()
 
 
 class TvPage(QWidget):
@@ -549,6 +602,9 @@ class Watched(QWidget):
         self.checkbox.setFixedWidth(15)
         self.layout.addWidget(self.checkbox)
 
+    def clear(self):
+        self.setText(False)
+
     def setText(self, value):
         if value in ["True", "true", True, 1, "1", "watched"]:
             self.checkbox.setChecked(True)
@@ -636,7 +692,7 @@ class PlainTextEdit(QPlainTextEdit):
         super().__init__(parent=parent)
         self._parent = parent
         self.setReadOnly(True)
-        self.setMaximumHeight(45)
+        self.setMaximumHeight(65)
         self.setProperty("class", "fieldtextedit")
 
     def text(self):
@@ -658,6 +714,9 @@ class GenreWidget(QWidget):
         self._widget_layout = None
         self._layout.setSpacing(0)
         self._layout.setContentsMargins(0, 0, 0, 0)
+
+    def clear(self):
+        return self.clear_layout()
 
     def clear_layout(self):
         for layout in [self._layout, self._widget_layout]:
@@ -752,6 +811,14 @@ class FieldLabel(QLabel):
                 msgbox = DateDialog(self._text, QDate().currentDate())
             msgbox.chosen.connect(self.setFieldChange)
             msgbox.exec()
+        elif self._text.lower() == "resolution":
+            result = QFileDialog.getOpenFileName(self, "Choose video file...", self._parent._data["path"], "Video File (*.mp4, *.mkv)")
+            if result and result[0]:
+                vid = cv2.VideoCapture(result[0])
+                height = int(vid.get(cv2.CAP_PROP_FRAME_HEIGHT))
+                width = int(vid.get(cv2.CAP_PROP_FRAME_WIDTH))
+                self._parent.setText(f"{height}x{width}")
+                self.fieldChanged.emit(f"{height}x{width}")
         elif self._text.lower() in ["runtime", "play\ncount"]:
             value = self._parent.line.text()
             if not value:
@@ -890,6 +957,7 @@ class DateDialog(QDialog):
 
 
 class CommandLinkButton(QCommandLinkButton):
+
     def __init__(self, description, parent=None):
         super().__init__(parent=parent)
         self._description = description
@@ -897,6 +965,29 @@ class CommandLinkButton(QCommandLinkButton):
     def setText(self, text):
         self.setDescription(text)
         super().setText(self._description)
+
+    def clear(self):
+        self.setText("")
+        self.setDescription("")
+
+class GenreLineEdit(QLineEdit):
+
+    def __init__(self, parent=None):
+        super().__init__(parent=parent)
+        self.setReadOnly(True)
+        self.setProperty("class", "GenreLine")
+        self.setMaximumHeight(55)
+
+    def setText(self, txt):
+        if isinstance(txt, list):
+            txt = "; ".join(txt)
+        super().setText(txt)
+
+class PinLabel(QLabel):
+
+    def __init__(self, parent=None):
+        super().__init__(parent=parent)
+        self.setMaximumHeight(55)
 
 
 class FieldWidget(QWidget):
@@ -907,6 +998,7 @@ class FieldWidget(QWidget):
         super().__init__(parent=parent)
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground)
         self._line = widget
+        self._data = None
         self._field = field
         self.setProperty("class", "fieldWidget")
         if len(field.split()) > 1:
@@ -914,6 +1006,7 @@ class FieldWidget(QWidget):
         self.label = FieldLabel(field, self)
         self.label.setProperty("class", "field")
         self.label.setFixedWidth(68)
+        self.setMinimumWidth(200)
         self.label.setAlignment(
             Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignHCenter
         )
@@ -925,7 +1018,7 @@ class FieldWidget(QWidget):
         elif self._field == "Watched":
             self.line = Watched(self)
             self.line.checkbox.clicked.connect(self.watchedToggled)
-        elif self._field in ["Genre", "Content Rating"]:
+        elif self._field in ["Content Rating","Genre"]:
             self.line = GenreWidget(self)
         elif self._field in ["NFO", "Trailer", "Folder"]:
             if self._field == "Trailer":
@@ -935,6 +1028,8 @@ class FieldWidget(QWidget):
             else:
                 self.line = CommandLinkButton("Open In Explorer", self)
             self.line.clicked.connect(self.open_path)
+        elif self._field == "Pin":
+            self.line = PinLabel()
         elif widget == "line":
             self.line = LineEdit(self)
         elif widget == "text":
@@ -957,13 +1052,40 @@ class FieldWidget(QWidget):
         else:
             subprocess.run(f"explorer.exe {self.line.description()}")
 
+    def setData(self, data):
+        self._data = data
+
     def setText(self, text):
         self._value = text
-        if isinstance(text, int):
+        if self._field == "Title" and not text:
+            title = self._data["foldername"].split(" (")[0]
+            self.fieldChanged.emit("Title", title)
+            text = title
+        if self._field == "Year" and not text:
+            year = self._data["foldername"].split(" (")[1]
+            self.fieldChanged.emit("Year", year)
+            text = year
+        if self._field == "Folder Size":
+            text = humanfriendly.format_size(int(text))
+        elif isinstance(text, int):
             text = str(text)
         self.line.setText(text)
         if isinstance(self.line, LineEdit):
             self.line.setCursorPosition(0)
+        if self._field == "Pin":
+            if text == "true":
+                self.line.setPixmap(utils.getimage("pin"))
+            else:
+                self.line.setPixmap(QPixmap())
+
+    def clear(self):
+        if self._field == "Pin":
+            self.line.setPixmap(QPixmap())
+        elif self._field == "Rating":
+            self.line.clearWidget()
+        else:
+            self.line.clear()
+
 
     def value(self):
         return self._value

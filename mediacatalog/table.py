@@ -1,4 +1,5 @@
 import json
+import random
 
 import humanfriendly
 from PySide6.QtCore import *
@@ -80,8 +81,10 @@ class ListModel(QAbstractListModel):
 
 
 class TableModel(QAbstractTableModel):
-    def __init__(self, table, mapping, fields=None, parent=None):
+    rowCountChanged = Signal()
+    def __init__(self, table, mapping, fields=None, parent=None, view=None):
         super().__init__(parent=parent)
+        self._view = view
         self._table = table
         self._fields = fields if fields is not None else self._table
         self._mapping = mapping
@@ -104,10 +107,13 @@ class TableModel(QAbstractTableModel):
             filters = self._last_filters
         data = []
         for record in self._master:
-            if (
-                filters["title"]
-                and filters["title"].lower() not in record["title"].lower()
-            ):
+            try:
+                if (
+                    filters["title"]
+                    and filters["title"].lower() not in record["title"].lower()
+                ):
+                    continue
+            except:
                 continue
             if filters["quality"] and record["quality"] not in filters["quality"]:
                 continue
@@ -141,6 +147,7 @@ class TableModel(QAbstractTableModel):
         self.beginResetModel()
         self._data = data
         self.endResetModel()
+        self.rowCountChanged.emit()
 
     def toggleKey(self, key):
         if key in self._headers:
@@ -158,6 +165,7 @@ class TableModel(QAbstractTableModel):
         while rows >= 0:
             self.removeRow(rows, QModelIndex())
             rows -= 1
+        self.rowCountChanged.emit()
         return
 
     def set_data(self, data):
@@ -171,12 +179,14 @@ class TableModel(QAbstractTableModel):
         del self._data[row]
         del self._master[row]
         self.endRemoveRows()
+        self.rowCountChanged.emit()
 
     def insertRow(self, row, value, parent=QModelIndex()):
         self.beginInsertRows(parent, row, row)
         self._data.insert(row, value)
         self._master.insert(row, value)
         self.endInsertRows()
+        self.rowCountChanged.emit()
 
     def getRow(self, index):
         return self._data[index.row()]
@@ -184,11 +194,14 @@ class TableModel(QAbstractTableModel):
     def getData(self):
         self.clearRows()
         data = getData(self._table)
-        for record in data:
+        for i, record in enumerate(data):
             path, foldername, data = record
             data = json.loads(data)
+            data["index"] = i
             self.insertRow(self.rowCount(QModelIndex()), data, QModelIndex())
             self.apply_filters()
+            self._view.setRowHeight(self.rowCount(QModelIndex()), self._view.rowHeight(self.rowCount(QModelIndex())))
+        self.rowCountChanged.emit()
 
     def rowCount(self, _) -> int:
         return len(self._data)
@@ -209,8 +222,13 @@ class TableModel(QAbstractTableModel):
     def data(self, index, role):
         if index.isValid():
             row, col = index.row(), index.column()
+
             field = self._headers_labels[col]
             text = self._data[row][field]
+            if field == "title" and not text:
+                text = self._data[row]["foldername"].split(" (")[0]
+            elif field == "year" and not text:
+                text = self._data[row]["foldername"].split(" (")[1][:-1]
             if field == "pin":
                 if text:
                     if role == Qt.ItemDataRole.DecorationRole:
@@ -237,6 +255,7 @@ class TableModel(QAbstractTableModel):
                     if isinstance(text, list):
                         return "  ".join(text)
                     else:
+                        print(text)
                         return text
             elif field == "foldersize":
                 if role == Qt.ItemDataRole.DisplayRole:
@@ -269,15 +288,35 @@ class TableModel(QAbstractTableModel):
         self.endInsertColumns()
 
 
+
+class SortProxyModel(QSortFilterProxyModel):
+    def __init__(self):
+        super().__init__()
+        self._random_sort = False
+
+    def setRandom(self):
+        self._random_sort = not self._random_sort
+
+    def lessThan(self, left, right):
+        if self._random_sort:
+            return random.choice([True, False])
+        else:
+            return super().lessThan(left, right)
+
+
+
 class TableView(QTableView):
+    rowCountChanged = Signal()
     def __init__(self, table, mapping, fields=None, parent=None):
         super().__init__(parent=parent)
         self._table = table
         self._fields = fields if fields is not None else table
-        self._model = TableModel(self._table, mapping, fields=fields)
-        self._proxy_model = QSortFilterProxyModel()
+        self._model = TableModel(self._table, mapping, fields=fields, view=self)
+        self._proxy_model = SortProxyModel()
         self._proxy_model.setSortRole(100)
         self.setModel(self._proxy_model)
+        self.setWordWrap(False)
+        self._model.rowCountChanged.connect(self.onRowCountChanged)
         self._proxy_model.setSourceModel(self._model)
         self._proxy_model.setDynamicSortFilter(True)
         self._delegate = Delegate(self)
@@ -292,6 +331,13 @@ class TableView(QTableView):
         )
         self.setSortingEnabled(True)
         self.columnMenu = None
+
+    def onRowCountChanged(self):
+        self.rowCountChanged.emit()
+
+
+    def rowHeight(self, row):
+        return QFontMetrics(self.font()).height() - 15
 
     def setColumnMenu(self, menu):
         self.columnMenu = menu()
@@ -311,29 +357,16 @@ class TableView(QTableView):
         self.tableModel().apply_filters(filters)
 
 
-# class PinDelegate(QStyledItemDelegate):
-#     def __init__(self, parent=None):
-#         super().__init__(parent)
-
-#     def paint(self, painter, option, index):
-#         value = self.parent().model().data(index, Qt.ItemDataRole.DisplayRole)
-#         if value:
-#             icon = geticon("pin")
-#             icon.paint(painter, option.rect, Qt.AlignCenter)
-
-
 class Delegate(QStyledItemDelegate):
     def __init__(self, parent=None):
         super().__init__(parent)
 
     def paint(self, painter, option, index):
-        header = (
-            self.parent()
-            .model()
-            .headerData(
-                index.column(), Qt.Orientation.Horizontal, Qt.ItemDataRole.DisplayRole
-            )
-        )
+        header = (self.parent().model().headerData(
+                index.column(),
+                Qt.Orientation.Horizontal,
+                Qt.ItemDataRole.DisplayRole
+            ))
         value = self.parent().model().data(index, Qt.ItemDataRole.DisplayRole)
         if header == "Watched":
             if value != "unwatched":
@@ -343,6 +376,7 @@ class Delegate(QStyledItemDelegate):
                 return
         elif header == "Pin":
             if value:
+
                 icon = geticon("pin")
                 icon.paint(painter, option.rect, Qt.AlignCenter)
             else:

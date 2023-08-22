@@ -18,7 +18,7 @@ class Window(QMainWindow):
     def __init__(self, parent=None) -> None:
         super().__init__(parent=parent)
         self.setObjectName("MainWindow")
-        self.setWindowTitle("Fuzzy's Media Manager")
+        self.setWindowTitle("Media Catalog")
         self.setWindowIcon(geticon("popcorn"))
         self.central = QStackedWidget()
         self.db = SqlDatabase(LOCAL / "media.db")

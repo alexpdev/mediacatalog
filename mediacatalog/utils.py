@@ -32,13 +32,14 @@ def geticon(text):
 
 
 EPISODE = {
+    "watched": "Watched",
     "episodetitle": "Episode Title",
     "episodenumber": "Episode Number",
     "episoderating": "Episode Rating",
-    "watched": "Watched",
     "playcount": "Play Count",
     "lastviewed": "Last Viewed",
     "dateadded": "Date Added",
+    "resolution": "Resolution",
     "pin": "Pin",
 }
 
@@ -65,6 +66,7 @@ TV_MAPPING = {
 }
 
 MAPPING = {
+    "watched": "Watched",
     "title": "Title",
     "plot": "Plot",
     "runtime": "Runtime",
@@ -89,8 +91,8 @@ MAPPING = {
     "foldername": "Folder Name",
     "foldersize": "Folder Size",
     "lastviewed": "Last Viewed",
-    "watched": "Watched",
     "pin": "Pin",
+    "resolution": "Resolution"
 }
 
 STATUS = [
@@ -178,11 +180,12 @@ def nfo_to_dict(content):
     record["studio"] = selector.xpath("//studio/text()").get()
     record["dateadded"] = selector.xpath("//dateadded/text()").get()
     record["status"] = selector.xpath("//status/text()").get()
+    record["resolution"] = ""
     record["lastviewed"] = ""
     record["comments"] = ""
     record["quality"] = ""
     record["watched"] = "unwatched"
-    record["pin"] = "0"
+    record["pin"] = ""
     if record["runtime"] is None:
         record["runtime"] = 0
     if record["status"] is None:
@@ -216,6 +219,7 @@ def tv_nfo_to_dict(content):
     record["studio"] = selector.xpath("//studio/text()").get()
     record["status"] = selector.xpath("//status/text()").get()
     record["comments"] = ""
+    record["resolution"] = ""
     if record["runtime"] is None:
         record["runtime"] = 0
     if record["status"] is None:
@@ -342,6 +346,10 @@ class EpisodeMenu(QMenu):
         self.addAction(self.dateadded_action)
         self.dateadded_action.setCheckable(True)
         self.dateadded_action.toggled.connect(lambda: self.columnToggled("Date Added"))
+        self.resolution_action = QAction("Resolution")
+        self.addAction(self.resolution_action)
+        self.resolution_action.setCheckable(True)
+        self.resolution_action.toggled.connect(lambda: self.columnToggled("Resolution"))
         self.pin_action = QAction("Pin")
         self.addAction(self.pin_action)
         self.pin_action.setCheckable(True)
@@ -364,6 +372,10 @@ class ColumnMenu(QMenu):
 
     def __init__(self, parent=None):
         super().__init__(parent=parent)
+        self.watched_action = QAction("Watched")
+        self.addAction(self.watched_action)
+        self.watched_action.setCheckable(True)
+        self.watched_action.toggled.connect(lambda: self.columnToggled("Watched"))
         self.title_action = QAction("Title")
         self.addAction(self.title_action)
         self.title_action.setCheckable(True)
@@ -466,10 +478,10 @@ class ColumnMenu(QMenu):
         self.lastviewed_action.toggled.connect(
             lambda: self.columnToggled("Last Viewed")
         )
-        self.watched_action = QAction("Watched")
-        self.addAction(self.watched_action)
-        self.watched_action.setCheckable(True)
-        self.watched_action.toggled.connect(lambda: self.columnToggled("Watched"))
+        self.resolution_action = QAction("Resolution")
+        self.addAction(self.resolution_action)
+        self.resolution_action.setCheckable(True)
+        self.resolution_action.toggled.connect(lambda: self.columnToggled("Resolution"))
         self.pin_action = QAction("Pin")
         self.addAction(self.pin_action)
         self.pin_action.setCheckable(True)

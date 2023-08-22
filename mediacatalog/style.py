@@ -332,9 +332,11 @@ QProgressBar::chunk
 
 QTreeView[class="Seasons"],
 QTreeView QHeaderView {
-    font-size: 12pt;
+    font-size: 10pt;
 }
-
+QTableView {
+    gridline-color: transparent;
+}
 QListView,
 QListWidget,
 QTableView,
@@ -343,6 +345,7 @@ QTextEdit
 {
     background-color: rgba(255, 255, 255, 255);
     color: rgba(25, 25, 25, 255);
+    font-size: 8pt;
 }
 QListView::item,
 QListWidget::item
@@ -669,7 +672,7 @@ QLabel[class="field"] {
     border-radius: 3px;
     font-size: 8pt;
     font-weight: bold;
-    border-bottom: 1px solid black;
+    /* border-bottom: 1px solid black; */
     color: #000;
 }
 QPlainTextEdit[class="fieldtextedit"],
@@ -677,8 +680,8 @@ QLineEdit[class="fieldedit"] {
     background-color: #CCC;
     color: #000;
     border: 2px transparent solid;
-    border-bottom: 2px solid black;
-    font-size: 11pt;
+    /* border-bottom: 2px solid black; */
+    font-size: 7pt;
     margin-top: 1px;
     margin-bottom: 1px;
 }
@@ -689,7 +692,7 @@ QLabel[class="genre"] {
     padding-top: 5px;
     padding-bottom: 5px;
     margin: 1px;
-    font-size: 9pt;
+    font-size: 8pt;
     border: 1px outset #233;
 }
 QCommandLinkButton {
@@ -714,13 +717,11 @@ QToolButton:pressed {
     background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
                                       stop: 0 #dadbde, stop: 1 #f6f7fa);
 }
-
-
 QToolButton::menu-button {
     border: 2px solid gray;
     border-top-right-radius: 6px;
     border-bottom-right-radius: 6px;
-    /* 16px width + 4px for border = 20px allocated above */
+    16px width + 4px for border = 20px allocated above
 }
 QToolButton:open { /* when the button has its menu open */
     background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
@@ -732,7 +733,9 @@ QToolButton::menu-indicator {
     subcontrol-origin: padding;
     subcontrol-position: bottom right;
 }
-
+QLineEdit[class="GenreLine"] {
+    border-color: transparent;
+}
 QToolButton::menu-indicator:pressed, QToolButton::menu-indicator:open {
     position: relative;
     top: 2px; left: 2px; /* shift the arrow by 2 px */
